@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bookshop-api-fastapi"
+version = "1.0.0"
+description = "The Bookshop API contract implemented with FastAPI, deployable to AWS Lambda behind API Gateway"
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = [
+  "uvicorn==0.54.0",
+  "pytest==9.2.0",
+  "pytest-asyncio==1.4.1",
+  "ruff==0.17.3",
+  "mypy==2.4.1",
+  "boto3==1.43.123",
+  "cfn-lint==1.59.0",
+]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["app*", "bookshop_client*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app", "bookshop_client", "examples", "tests"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_any_generics = false
+warn_return_any = false
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "B011"]

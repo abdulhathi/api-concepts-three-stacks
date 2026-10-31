@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.aws-sam/
+bin/
+obj/
+*.user
+TestResults/
+
+# Local settings
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/

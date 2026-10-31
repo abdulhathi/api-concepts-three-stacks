@@ -1,0 +1,104 @@
+import { createHmac } from 'node:crypto';
+import { expect } from 'vitest';
+
+/** The server under test. `run.sh` sets API_URL (not BASE_URL, which Vite reserves); the default is the Python stack. */
+export const BASE = (process.env.API_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
+export const DEV_SECRET = process.env.JWT_SECRET ?? 'dev-only-secret-change-me-0123456789abcdef';
+export const ALLOWED_ORIGIN = 'http://localhost:5173';
+export const TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+export const SECRETS: Record<string, string> = {
+  reader: 'reader-secret',
+  writer: 'writer-secret',
+  partner: 'partner-secret',
+  admin: 'admin-secret',
+  free: 'free-secret',
+};
+
+type Options = {
+  method?: string;
+  token?: string;
+  headers?: Record<string, string>;
+  /** Sent as JSON unless it is already a string. */
+  body?: unknown;
+};
+
+export async function call(path: string, { method = 'GET', token, headers = {}, body }: Options = {}) {
+  const h: Record<string, string> = { ...headers };
+  if (token) h.authorization = `Bearer ${token}`;
+  let payload: string | undefined;
+  if (body !== undefined) {
+    payload = typeof body === 'string' ? body : JSON.stringify(body);
+    h['content-type'] ??= 'application/json';
+  }
+  return fetch(`${BASE}${path}`, { method, headers: h, body: payload });
+}
+
+/** Calls and parses the JSON body (null for an empty body). */
+export async function json(path: string, options: Options = {}) {
+  const res = await call(path, options);
+  const text = await res.text();
+  return { res, body: text ? JSON.parse(text) : null };
+}
+
+/** Client-credentials token, sent with HTTP Basic. Cached per client and scope. */
+const tokens = new Map<string, string>();
+export async function token(client: string, scope?: string): Promise<string> {
+  const key = `${client} ${scope ?? ''}`;
+  const cached = tokens.get(key);
+  if (cached) return cached;
+  const form = new URLSearchParams({ grant_type: 'client_credentials' });
+  if (scope) form.set('scope', scope);
+  const res = await fetch(`${BASE}/oauth/token`, {
+    method: 'POST',
+    headers: {
+      authorization: `Basic ${Buffer.from(`${client}:${SECRETS[client]}`).toString('base64')}`,
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body: form,
+  });
+  expect(res.status, `token for ${client}`).toBe(200);
+  const body = await res.json();
+  tokens.set(key, body.access_token);
+  return body.access_token;
+}
+
+/** Asserts an RFC 9457 problem with the spec's slug, and returns its body. */
+export async function problem(res: Response, status: number, slug: string, path?: string) {
+  expect(res.status).toBe(status);
+  expect(res.headers.get('content-type') ?? '').toContain('application/problem+json');
+  const body = await res.json();
+  expect(body.type).toBe(`/problems/${slug}`);
+  expect(body.status).toBe(status);
+  expect(typeof body.title).toBe('string');
+  expect(body.requestId).toBe(res.headers.get('x-request-id'));
+  if (path) expect(body.instance).toBe(path);
+  return body;
+}
+
+/** Signs a JWT the way the servers do, so tests can forge expired or wrongly signed tokens. */
+export function signJwt(claims: Record<string, unknown>, secret = DEV_SECRET, alg = 'HS256') {
+  const part = (x: unknown) => Buffer.from(JSON.stringify(x)).toString('base64url');
+  const head = `${part({ alg, typ: 'JWT' })}.${part(claims)}`;
+  const sig = alg === 'none' ? '' : createHmac('sha256', secret).update(head).digest('base64url');
+  return `${head}.${sig}`;
+}
+
+export function claims(overrides: Record<string, unknown> = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  return {
+    iss: 'api-concepts',
+    aud: 'api-concepts-clients',
+    sub: 'reader',
+    scope: 'products:read orders:read',
+    iat: now,
+    exp: now + 300,
+    jti: crypto.randomUUID(),
+    ...overrides,
+  };
+}
+
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A unique, valid idempotency key or demo key. */
+export const uniqueKey = () => crypto.randomUUID();

@@ -1,0 +1,100 @@
+# Concept 21 · Throttling (cloud level): API Gateway stage throttling in front of the Lambda.
+# The app still enforces its own limits (concept 20 per client, concept 21 on the report queue);
+# the gateway limit is the coarse outer wall that protects the function from floods.
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Bookshop API (FastAPI on Lambda behind an API Gateway HTTP API)
+
+Parameters:
+  JwtSecretParameterName:
+    Type: String
+    Default: api-concepts/jwt-secret
+    Description: SSM SecureString holding the HS256 key, without a leading slash (create it first, see README)
+  CorsOrigins:
+    Type: String
+    Default: http://localhost:5173
+    Description: Comma-separated browser origins allowed by the app's CORS layer
+  ThrottleRateLimit:
+    Type: Number
+    Default: 50
+    Description: Steady-state requests per second allowed through the stage
+  ThrottleBurstLimit:
+    Type: Number
+    Default: 100
+    Description: Burst capacity of the stage token bucket
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 180, 365]
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [arm64]
+    MemorySize: 512
+    Timeout: 15 # API Gateway HTTP APIs cut requests off at 30 s; the app's own report timeout is 2 s
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile # see ../../Makefile: installs requirements.txt for Lambda's arm64 platform
+    Properties:
+      CodeUri: ../../
+      Handler: app.lambda_handler.handler # Mangum adapts API Gateway events to ASGI
+      Description: Bookshop API
+      Environment:
+        Variables:
+          JWT_SECRET_PARAMETER: !Sub "/${JwtSecretParameterName}" # read at cold start, see app/aws.py
+          CORS_ORIGINS: !Ref CorsOrigins
+          REQUEST_TIMEOUT_MS: "2000"
+      LoggingConfig:
+        LogGroup: !Ref ApiFunctionLogGroup
+        LogFormat: Text # the app already writes one JSON line per request
+      Policies:
+        - SSMParameterReadPolicy:
+            ParameterName: !Ref JwtSecretParameterName
+      Events:
+        AnyRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: ANY
+
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetentionDays # logs hold request ids and client ids: do not keep them forever
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ThrottleRateLimit
+        ThrottlingBurstLimit: !Ref ThrottleBurstLimit
+        DetailedMetricsEnabled: true
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogGroup.Arn
+        Format: >-
+          {"requestId":"$context.requestId","ip":"$context.identity.sourceIp","method":"$context.httpMethod",
+          "path":"$context.path","status":"$context.status","integrationLatencyMs":"$context.integrationLatency",
+          "responseLatencyMs":"$context.responseLatency"}
+
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: !Ref LogRetentionDays
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the API (HTTPS is terminated by API Gateway)
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
+  FunctionName:
+    Value: !Ref ApiFunction

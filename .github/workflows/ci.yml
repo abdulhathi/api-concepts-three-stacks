@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python-fastapi-aws:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-fastapi-aws
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
+      - name: Unit and integration tests
+        run: .venv/bin/pytest -q
+      - name: Contract tests
+        working-directory: contract-tests
+        run: npm ci && ./run.sh python
+
+  node-typescript-gcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: node-typescript-gcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit and integration tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Contract tests
+        working-directory: contract-tests
+        run: npm ci && ./run.sh node
+
+  dotnet-azure:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dotnet-azure
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit and integration tests
+        run: dotnet test -c Release
+      - name: Contract tests
+        working-directory: contract-tests
+        run: npm ci && ./run.sh dotnet

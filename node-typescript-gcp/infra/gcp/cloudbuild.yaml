@@ -1,0 +1,31 @@
+# Cloud Build: test the code, build the container image and push it to Artifact Registry.
+# Run from the stack folder:
+#   gcloud builds submit --config infra/gcp/cloudbuild.yaml \
+#     --substitutions _REGION=us-central1,_REPO=bookshop
+# `gcloud run deploy` is a separate step (see deploy.sh) so that runtime settings live in one place.
+substitutions:
+  _REGION: us-central1
+  _REPO: bookshop
+  _SERVICE: bookshop-api
+
+steps:
+  - id: test
+    name: node:24-slim
+    entrypoint: bash
+    args: ['-c', 'npm ci && npm run typecheck && npm test']
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+
+# Listing the images makes Cloud Build push them once every step has succeeded.
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,35 @@
+{
+  "name": "bookshop-api-node-gcp",
+  "version": "1.0.0",
+  "description": "The Bookshop API contract implemented with Node.js, TypeScript and Express 5, deployable to Google Cloud Run.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "example:retry": "tsx examples/retry-flaky.ts"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "9.1.0",
+    "express": "5.3.0",
+    "graphql": "17.0.2",
+    "graphql-http": "1.23.1",
+    "jose": "6.2.14",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.6",
+    "@types/supertest": "7.2.1",
+    "supertest": "7.3.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  }
+}
