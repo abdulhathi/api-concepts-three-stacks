@@ -751,3 +751,9 @@ button.btn { cursor: pointer; font-family: inherit; }
 .vs-hl { display: block; border-radius: 4px; padding: 0 4px; transition: background 0.3s; }
 .vs-hl.on { background: color-mix(in srgb, var(--k-os) 30%, transparent); }
 @media (max-width: 700px) { .code-drawer { width: 100vw; } }
+.target-bar { display: flex; gap: 6px; margin-top: 14px; }
+.chip-btn.on { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.build section { margin: 26px 0; max-width: 80ch; }
+.build-status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.build-notes { padding-left: 1.2em; }
+.build-notes li { margin-bottom: 6px; }

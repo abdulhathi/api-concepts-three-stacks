@@ -1,4 +1,5 @@
 import { LEVELS, levelOf, TOPICS } from '../curriculum';
+import { passedByHand, useBuildProgress } from '../lib/contract';
 import { studyDone, useProgress } from '../lib/progress';
 import { hrefFor } from '../lib/route';
 import { useWatched } from '../video/watched';
@@ -7,7 +8,9 @@ import { useWatched } from '../video/watched';
 export function Sidebar({ current }: { current: string }) {
   const watched = useWatched();
   const progress = useProgress();
-  const doneOf = (id: string) => Object.values(studyDone(progress[id], watched[id]?.done ?? false)).filter(Boolean).length;
+  const byHand = useBuildProgress();
+  const doneOf = (id: string) =>
+    Object.values(studyDone(progress[id], watched[id]?.done ?? false, passedByHand(byHand, TOPICS.find((t) => t.id === id)!.n))).filter(Boolean).length;
   const finished = TOPICS.filter((t) => doneOf(t.id) === 6).length;
   const open = levelOf(current)?.key;
   return (

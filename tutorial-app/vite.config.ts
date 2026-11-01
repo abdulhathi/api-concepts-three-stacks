@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { inboxPlugin, stackProxies } from './server/lab';
+import { buildProgressPlugin, inboxPlugin, stackProxies } from './server/lab';
 import { wordsPlugin } from './server/words';
 
 export default defineConfig({
@@ -11,11 +11,13 @@ export default defineConfig({
     wordsPlugin({ header: 'x-api-concepts-lab' }),
     // Webhook deliveries from the API land at /lab/inbox/<box>, for the webhooks practice lab.
     inboxPlugin(),
+    // Your hand-built API's progress.json, for the Build tab.
+    buildProgressPlugin(),
   ],
   // Relative asset paths, so the build works from any folder or a GitHub Pages subpath.
   base: './',
   server: {
-    // Practice requests: /stack/python → :8001, /stack/node → :8002, /stack/dotnet → :8003.
+    // Practice requests: /stack/python → :8001, /stack/node → :8002, /stack/dotnet → :8003; /mine/… → :9001-9003.
     proxy: stackProxies(),
     // Vite's own CORS handler answers every OPTIONS request itself; the CORS lab needs the API's real preflight answer.
     cors: false,

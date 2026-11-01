@@ -41,9 +41,32 @@ export async function json(path: string, options: Options = {}) {
   return { res, body: text ? JSON.parse(text) : null };
 }
 
+/**
+ * How the suite gets its tokens. A server built from scratch, one concept at a time, can be tested before it has
+ * every piece of security (the hand-built track sets this in check.sh):
+ *   oauth (default)  from the server's POST /oauth/token, as SPEC.md says
+ *   local            the suite signs the JWT itself: the server checks tokens but has no token endpoint yet
+ *   off              a placeholder: the server does not check tokens yet
+ */
+export const AUTH = (process.env.CONTRACT_AUTH ?? 'oauth') as 'oauth' | 'local' | 'off';
+
+/** The concepts the server has built (CONTRACT_BUILT=1,2,3). Unset means all of them. */
+const BUILT = process.env.CONTRACT_BUILT?.split(',').map((n) => Number(n.trim()));
+export const built = (concept: number) => !BUILT || BUILT.includes(concept);
+
+const SCOPES: Record<string, string> = {
+  reader: 'products:read orders:read',
+  writer: 'products:read products:write orders:read orders:write',
+  partner: 'products:read products:write orders:read orders:write',
+  admin: 'products:read products:write orders:read orders:write admin',
+  free: 'products:read',
+};
+
 /** Client-credentials token, sent with HTTP Basic. Cached per client and scope. */
 const tokens = new Map<string, string>();
 export async function token(client: string, scope?: string): Promise<string> {
+  if (AUTH === 'off') return `not-checked-yet-${client}`;
+  if (AUTH === 'local') return signJwt(claims({ sub: client, scope: scope ?? SCOPES[client], exp: Math.floor(Date.now() / 1000) + 900 }));
   const key = `${client} ${scope ?? ''}`;
   const cached = tokens.get(key);
   if (cached) return cached;

@@ -18,7 +18,8 @@ All three follow one written contract, [`SPEC.md`](SPEC.md), and one black-box t
 **Learn it:** [`tutorial-app/`](tutorial-app/) is the **API Concepts Lab**, a course built on this code. Each concept
 has a narrated video with animated diagrams (about 11 minutes, 27 in all), the concept guide, and a practice lab that
 sends real requests to the three running servers, checks the answers, opens the code that handled them, and ends with
-a change to build yourself.
+a change to build yourself. Its **Build** tab then has you write each concept from scratch in your own API, graded by
+these same contract tests: [bookshop-api-handbuilt](https://github.com/abdulhathi/bookshop-api-handbuilt).
 
 ## The 27 concepts
 

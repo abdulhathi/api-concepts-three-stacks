@@ -1,7 +1,7 @@
 // Sending a practice request and checking the answer. Requests go to /stack/<id>/…, which the lab's dev server
 // proxies to the chosen server; headers a browser may not set (Origin, Access-Control-Request-*) travel as
 // X-Lab-Set-<name> and the proxy renames them (vite.config.ts).
-import { stackOf, type StackId } from '../lib/stacks';
+import { currentTarget, portOf, type StackId } from '../lib/stacks';
 import type { ClientId, Expect, LabRequest } from './types';
 
 export type Vars = Record<string, string>;
@@ -41,11 +41,11 @@ export function missingVars(req: LabRequest, vars: Vars): string[] {
 const FORBIDDEN = new Set(['origin', 'access-control-request-method', 'access-control-request-headers']);
 
 /** Where requests go: through the lab's proxy (the default), or straight to the servers (the live test, in Node). */
-let target = { base: (stack: StackId) => `/stack/${stack}`, direct: false };
+let target = { base: (stack: StackId) => `/${currentTarget()}/${stack}`, direct: false };
 
 /** Send requests straight to http://127.0.0.1:<port>, with Origin and friends as real headers. For tests in Node. */
 export function sendDirect() {
-  target = { base: (stack) => `http://127.0.0.1:${stackOf(stack).port}`, direct: true };
+  target = { base: (stack) => `http://127.0.0.1:${portOf(stack)}`, direct: true };
 }
 
 /** The headers and body of a request, as the API should receive them. */
@@ -69,7 +69,7 @@ const tokens = new Map<string, { token: string; until: number }>();
 
 /** An access token for a demo client, from the stack's own token endpoint, kept until 30 seconds before it expires. */
 export async function tokenFor(stack: StackId, client: ClientId): Promise<string> {
-  const key = `${stack}:${client}`;
+  const key = `${currentTarget()}:${stack}:${client}`;
   const hit = tokens.get(key);
   if (hit && hit.until > Date.now()) return hit.token;
   const r = await fetch(`${target.base(stack)}/oauth/token`, {
@@ -78,7 +78,7 @@ export async function tokenFor(stack: StackId, client: ClientId): Promise<string
     body: 'grant_type=client_credentials',
     cache: 'no-store',
   });
-  if (!r.ok) throw new Error(`Could not get a token for "${client}" (HTTP ${r.status}). Is the ${stackOf(stack).short} server running?`);
+  if (!r.ok) throw new Error(`Could not get a token for "${client}" (HTTP ${r.status} from port ${portOf(stack)}). Is the server running, and does it have POST /oauth/token (concept 13) yet?`);
   const t = (await r.json()) as { access_token: string; expires_in: number };
   tokens.set(key, { token: t.access_token, until: Date.now() + (t.expires_in - 30) * 1000 });
   return t.access_token;
@@ -171,7 +171,7 @@ const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 /** The same request as a curl command for your terminal, with $NAME for values not known yet. */
 export function curlFor(req: LabRequest, stack: StackId, vars: Vars): string {
   const known = (text: string) => fill(text, vars).replace(PLACEHOLDER, (_m, name: string) => `$${name}`);
-  const base = `http://localhost:${stackOf(stack).port}`;
+  const base = `http://localhost:${portOf(stack)}`;
   const parts = [`curl -si -X ${req.method} "${base}${known(req.path)}"`];
   if (req.basic) parts.push(`-u ${req.basic.join(':')}`);
   if (req.as) parts.push(`-H "Authorization: Bearer $${req.as.toUpperCase()}_TOKEN"`);
@@ -192,7 +192,7 @@ export function curlFor(req: LabRequest, stack: StackId, vars: Vars): string {
 
 /** The terminal line that puts a client's token in $<CLIENT>_TOKEN, for the curl commands. */
 export const tokenCommand = (client: ClientId, stack: StackId) =>
-  `${client.toUpperCase()}_TOKEN=$(curl -s -u ${client}:${client}-secret -d grant_type=client_credentials http://localhost:${stackOf(stack).port}/oauth/token | jq -r .access_token)`;
+  `${client.toUpperCase()}_TOKEN=$(curl -s -u ${client}:${client}-secret -d grant_type=client_credentials http://localhost:${portOf(stack)}/oauth/token | jq -r .access_token)`;
 
 /** A random UUID, also where crypto.randomUUID is missing (plain-HTTP pages outside localhost). */
 export function uuid(): string {

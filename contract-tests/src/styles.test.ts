@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { call, json, problem, token, uniqueKey } from './http';
+import { built, call, json, problem, token, uniqueKey } from './http';
 
 const seedIds = Array.from({ length: 25 }, (_, i) => `prd_${String(i + 1).padStart(2, '0')}`);
 
@@ -33,7 +33,7 @@ describe('17 · GraphQL', () => {
     expect(second.body.data.products.nodes[0].id).toBe('prd_03');
   });
 
-  it('fetches an order with its products in one round trip', async () => {
+  it.skipIf(!built(22))('fetches an order with its products in one round trip', async () => {
     const writer = await token('writer');
     const order = await json('/v1/orders', {
       method: 'POST',

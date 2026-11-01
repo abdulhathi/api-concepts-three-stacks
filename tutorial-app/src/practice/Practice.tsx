@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CopyBlock } from '../components/Copy';
 import { openCode } from '../lib/code';
 import { passStep, resetPractice, setMark, useProgress } from '../lib/progress';
-import { setStack, STACKS, stackOf, useHealth, useStack, type StackId } from '../lib/stacks';
+import { portOf, setStack, setTarget, STACKS, stackOf, useHealth, useStack, useTarget, type StackId } from '../lib/stacks';
 import { check, curlFor, fill, fillDeep, missingVars, pick, prepare, send, tokenCommand, uuid, webhookSignature, type Check, type Result, type Vars } from './run';
 import type { BuildStep, InboxStep, LabRequest, Practice, PracticeStep, ReadStep, ThinkStep, TryStep } from './types';
 
@@ -17,7 +17,8 @@ const labOrigin = () => (typeof window === 'undefined' ? 'http://localhost:5195'
 /** The practice lab of one concept: pick a stack, then work through the steps in order. */
 export function PracticeView({ topicId, practice }: { topicId: string; practice: Practice }) {
   const stack = useStack();
-  const health = useHealth();
+  const target = useTarget();
+  const health = useHealth(5000, target);
   const progress = useProgress()[topicId];
   const [base, setBase] = useState<Vars>(() => makeVars(practice));
   const [saved, setSaved] = useState<Partial<Record<StackId, Vars>>>({});
@@ -35,23 +36,39 @@ export function PracticeView({ topicId, practice }: { topicId: string; practice:
     <div className="practice">
       <p className="lede-sm">{practice.intro}</p>
 
+      <div className="target-bar" role="group" aria-label="Whose servers">
+        <button type="button" className={target === 'stack' ? 'chip-btn on' : 'chip-btn'} aria-pressed={target === 'stack'} onClick={() => setTarget('stack')}>
+          Reference servers
+        </button>
+        <button type="button" className={target === 'mine' ? 'chip-btn on' : 'chip-btn'} aria-pressed={target === 'mine'} onClick={() => setTarget('mine')}>
+          My servers (built by hand)
+        </button>
+      </div>
       <div className="stack-bar" role="group" aria-label="Server to practice on">
         {STACKS.map((s) => (
           <button key={s.id} type="button" className={s.id === stack ? 'stack-btn on' : 'stack-btn'} aria-pressed={s.id === stack} onClick={() => setStack(s.id)}>
             <span className={`dot ${health[s.id]}`} aria-hidden="true" />
             {s.name}
-            <span className="stack-port">:{s.port}</span>
+            <span className="stack-port">:{portOf(s.id, target)}</span>
             {progress?.practiced?.includes(s.id) && <span className="tag ok">done</span>}
           </button>
         ))}
       </div>
-      {health[stack] === 'down' && (
-        <div className="box warn">
-          <span className="box-label">{stackOf(stack).short} server is not running</span>
-          <p>Start it in a terminal from the folder that holds SPEC.md (or from Study Hub, if you use it):</p>
-          <CopyBlock text={stackOf(stack).start} />
-        </div>
-      )}
+      {health[stack] === 'down' &&
+        (target === 'stack' ? (
+          <div className="box warn">
+            <span className="box-label">{stackOf(stack).short} server is not running</span>
+            <p>Start it in a terminal from the folder that holds SPEC.md (or from Study Hub, if you use it):</p>
+            <CopyBlock text={stackOf(stack).start} />
+          </div>
+        ) : (
+          <div className="box warn">
+            <span className="box-label">Your {stackOf(stack).short} server is not running</span>
+            <p>Start your own server on port {stackOf(stack).minePort}, from the bookshop-api-handbuilt folder:</p>
+            <CopyBlock text={`cd ${stackOf(stack).mineDir} && ./start.sh`} />
+            <p className="small">Steps that send a token need your POST /oauth/token (concept 13). Until then, use the Build tab’s check instead.</p>
+          </div>
+        ))}
 
       <div className="practice-tools">
         <span>
@@ -126,8 +143,9 @@ function preview(req: LabRequest, vars: Vars): string {
 }
 
 function TryView({ step, stack, vars, onPass, onSave, saverOf }: StepProps & { step: TryStep }) {
-  const [state, setState] = useState<{ busy?: boolean; results?: Result[]; checks?: Check[]; error?: string; stack?: StackId }>({});
+  const [state, setState] = useState<{ busy?: boolean; results?: Result[]; checks?: Check[]; error?: string; stack?: StackId; target?: string }>({});
   const [curl, setCurl] = useState(false);
+  const target = useTarget();
   const missing = missingVars(step.request, vars);
   const run = async () => {
     setState({ busy: true });
@@ -135,7 +153,7 @@ function TryView({ step, stack, vars, onPass, onSave, saverOf }: StepProps & { s
       const results = await send(stack, step.request, vars);
       const checks = check(fillDeep(step.expect, vars), results);
       const last = results.at(-1)!;
-      setState({ results, checks, stack });
+      setState({ results, checks, stack, target });
       if (step.save) {
         const values: Vars = {};
         for (const [name, path] of Object.entries(step.save)) {
@@ -150,7 +168,7 @@ function TryView({ step, stack, vars, onPass, onSave, saverOf }: StepProps & { s
     }
   };
   // A result from another stack would mislead: clear it when the stack changes.
-  const results = state.stack === stack ? state.results : undefined;
+  const results = state.stack === stack && state.target === target ? state.results : undefined;
   return (
     <div className="pstep-body">
       <p>{step.goal}</p>

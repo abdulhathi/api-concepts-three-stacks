@@ -1,6 +1,7 @@
 import { CopyBlock } from '../components/Copy';
 import { LEVELS, TOPICS } from '../curriculum';
 import { PRACTICE_IDS, useVideoLengths, VIDEO_IDS } from '../lessons';
+import { passedByHand, useBuildProgress } from '../lib/contract';
 import { STUDY_STEPS, studyDone, useProgress } from '../lib/progress';
 import { hrefFor } from '../lib/route';
 import { STACKS, useHealth } from '../lib/stacks';
@@ -22,7 +23,9 @@ export function Home() {
   const progress = useProgress();
   const lengths = useVideoLengths();
   const health = useHealth();
-  const doneOf = (id: string) => Object.values(studyDone(progress[id], watched[id]?.done ?? false)).filter(Boolean).length;
+  const byHand = useBuildProgress();
+  const doneOf = (id: string) =>
+    Object.values(studyDone(progress[id], watched[id]?.done ?? false, passedByHand(byHand, TOPICS.find((t) => t.id === id)!.n))).filter(Boolean).length;
   const next = TOPICS.find((t) => doneOf(t.id) < 6) ?? TOPICS[0];
   const finished = TOPICS.filter((t) => doneOf(t.id) === 6).length;
   const total = Object.values(lengths).reduce((a, b) => a + b, 0);
@@ -72,7 +75,7 @@ export function Home() {
             <b>{STUDY_STEPS[3].label}.</b> Switch the server and send the same requests. Same contract, different framework: open the code and compare.
           </li>
           <li>
-            <b>{STUDY_STEPS[4].label}.</b> Change or extend the code yourself, with hints if you need them, and check it with a request or a test.
+            <b>{STUDY_STEPS[4].label}.</b> Write the concept yourself in your own Bookshop API (the bookshop-api-handbuilt repo), then run <code>./check.sh</code>: the same contract tests the reference passes grade your code.
           </li>
           <li>
             <b>{STUDY_STEPS[5].label}.</b> Say each answer aloud before you open it. If you cannot explain it simply, watch that part of the video again.

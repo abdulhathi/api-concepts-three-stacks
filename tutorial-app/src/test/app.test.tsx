@@ -20,7 +20,7 @@ describe('the app', () => {
     render(<App />);
     expect(screen.getByRole('region', { name: 'Your steps for this concept' })).toBeInTheDocument();
     const tabs = within(screen.getByRole('navigation', { name: 'Parts of this concept' }));
-    for (const tab of ['Watch', 'Learn', 'Practice']) expect(tabs.getByRole('link', { name: new RegExp(tab) })).toBeInTheDocument();
+    for (const tab of ['Watch', 'Learn', 'Practice', 'Build']) expect(tabs.getByRole('link', { name: new RegExp(tab) })).toBeInTheDocument();
     if (VIDEO_IDS.has(id)) await waitFor(() => expect(screen.getByRole('region', { name: /Video lesson/ })).toBeInTheDocument());
   });
 
@@ -36,5 +36,12 @@ describe('the app', () => {
     render(<App />);
     await waitFor(() => expect(screen.getByRole('group', { name: 'Server to practice on' })).toBeInTheDocument());
     expect(screen.getAllByRole('button', { name: /^Send to / }).length).toBeGreaterThan(2);
+  });
+
+  it('shows the Build tab with the contract tests and the check command', async () => {
+    window.location.hash = '#/idempotency/build';
+    render(<App />);
+    expect(await screen.findByText(/requires an Idempotency-Key on order creation/)).toBeInTheDocument();
+    expect(screen.getByText(/\.\/check\.sh python 22/)).toBeInTheDocument();
   });
 });

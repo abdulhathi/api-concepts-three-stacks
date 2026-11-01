@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALLOWED_ORIGIN, BASE, call, claims, json, problem, SECRETS, signJwt, token, uniqueKey } from './http';
+import { ALLOWED_ORIGIN, AUTH, BASE, built, call, claims, json, problem, SECRETS, signJwt, token, uniqueKey } from './http';
 
 const tokenRequest = (form: Record<string, string>, basic?: [string, string]) =>
   fetch(`${BASE}/oauth/token`, {
@@ -39,7 +39,7 @@ describe('10 · Authentication', () => {
   });
 
   it('accepts any correctly signed token, because the JWT is self-contained', async () => {
-    const res = await call('/v1/me', { token: signJwt(claims()) });
+    const res = await call('/v1/echo', { token: signJwt(claims()) });
     expect(res.status).toBe(200);
   });
 });
@@ -57,7 +57,7 @@ describe('11 · Authorization', () => {
     expect(challenge).toContain('scope="products:write"');
   });
 
-  it("hides another client's order behind a 404, but admin can see it", async () => {
+  it.skipIf(!built(22))("hides another client's order behind a 404, but admin can see it", async () => {
     const created = await json('/v1/orders', {
       method: 'POST',
       token: await token('writer'),
@@ -72,14 +72,14 @@ describe('11 · Authorization', () => {
     expect((await call(path, { token: await token('writer') })).status).toBe(200);
   });
 
-  it("lists only the caller's own orders", async () => {
+  it.skipIf(!built(22))("lists only the caller's own orders", async () => {
     const { body } = await json('/v1/orders?limit=50', { token: await token('partner') });
     for (const order of body.data) expect(order.clientId).toBe('partner');
   });
 });
 
 describe('12 · Access tokens and JWT', () => {
-  it('issues an HS256 JWT with the expected claims', async () => {
+  it.skipIf(AUTH !== 'oauth')('issues an HS256 JWT with the expected claims', async () => {
     const t = await token('writer');
     const [head, payload] = t.split('.').slice(0, 2).map((p) => JSON.parse(Buffer.from(p, 'base64url').toString() || 'null'));
     expect(head).toMatchObject({ alg: 'HS256', typ: 'JWT' });

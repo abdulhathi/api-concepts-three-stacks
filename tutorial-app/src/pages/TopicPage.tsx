@@ -1,6 +1,8 @@
+import { BuildTab } from '../build/BuildTab';
 import { levelOf, TOPICS, type Topic } from '../curriculum';
 import { Guide } from '../components/Guide';
 import { GUIDE_IDS, PRACTICE_IDS, useGuide, usePractice, useVideo, VIDEO_IDS } from '../lessons';
+import { passedByHand, useBuildProgress } from '../lib/contract';
 import { STUDY_STEPS, studyDone, toggleMark, useProgress } from '../lib/progress';
 import { hrefFor, useAnchor } from '../lib/route';
 import { PracticeView } from '../practice/Practice';
@@ -11,6 +13,7 @@ const TABS = [
   { key: '', label: 'Watch', has: VIDEO_IDS },
   { key: 'learn', label: 'Learn', has: GUIDE_IDS },
   { key: 'practice', label: 'Practice', has: PRACTICE_IDS },
+  { key: 'build', label: 'Build', has: GUIDE_IDS },
 ] as const;
 
 /** One concept: your study steps, then three tabs: the video, the guide and the practice lab. */
@@ -51,6 +54,7 @@ export function TopicPage({ topic }: { topic: Topic }) {
       {tab.key === '' && <WatchTab topic={topic} />}
       {tab.key === 'learn' && <LearnTab topic={topic} />}
       {tab.key === 'practice' && <PracticeTab topic={topic} />}
+      {tab.key === 'build' && <BuildTab topic={topic} />}
 
       <nav className="pager" aria-label="Previous and next concept">
         {TOPICS[index - 1] ? (
@@ -80,7 +84,7 @@ export function TopicPage({ topic }: { topic: Topic }) {
 function StudySteps({ topic }: { topic: Topic }) {
   const watched = useWatched()[topic.id]?.done ?? false;
   const marks = useProgress()[topic.id];
-  const done = studyDone(marks, watched);
+  const done = studyDone(marks, watched, passedByHand(useBuildProgress(), topic.n));
   const count = Object.values(done).filter(Boolean).length;
   return (
     <section className="study" aria-label="Your steps for this concept">

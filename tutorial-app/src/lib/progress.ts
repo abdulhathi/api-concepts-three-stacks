@@ -64,20 +64,21 @@ export const STUDY_STEPS = [
   { key: 'read', label: 'Read the guide and the code', tab: 'learn' },
   { key: 'practice', label: 'Run every practice step in your stack', tab: 'practice' },
   { key: 'compare', label: 'Run them again on a second stack', tab: 'practice' },
-  { key: 'build', label: 'Do the build challenge', tab: 'practice' },
+  { key: 'build', label: 'Build it in your own API', tab: 'build' },
   { key: 'explain', label: 'Answer the interview questions out loud', tab: 'learn' },
 ] as const;
 
 export type StudyKey = (typeof STUDY_STEPS)[number]['key'];
 
-export function studyDone(m: Marks | undefined, watched: boolean): Record<StudyKey, boolean> {
+/** `byHand`: the concept passed its contract tests in your own API (progress.json). */
+export function studyDone(m: Marks | undefined, watched: boolean, byHand = false): Record<StudyKey, boolean> {
   const practiced = m?.practiced?.length ?? 0;
   return {
     watch: watched,
     read: Boolean(m?.read),
     practice: practiced >= 1,
     compare: practiced >= 2,
-    build: Boolean(m?.built),
+    build: Boolean(m?.built) || byHand,
     explain: Boolean(m?.explained),
   };
 }

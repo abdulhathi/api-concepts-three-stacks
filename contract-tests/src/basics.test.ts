@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { call, json, problem, TIMESTAMP, token } from './http';
+import { AUTH, built, call, json, problem, TIMESTAMP, token } from './http';
 
 describe('1 · Requests and responses', () => {
   it('echoes the method, path, query, headers and body it received', async () => {
@@ -58,7 +58,7 @@ describe('3 · HTTP methods', () => {
     expect(patch.body).toMatchObject({ title: 'Methods Matter 2e', priceCents: 1800, version: 3 });
 
     const notAdmin = await call(`/v1/products/${id}`, { method: 'DELETE', token: writer });
-    await problem(notAdmin, 403, 'forbidden');
+    if (AUTH !== 'off') await problem(notAdmin, 403, 'forbidden');
 
     const del = await call(`/v1/products/${id}`, { method: 'DELETE', token: await token('admin') });
     expect(del.status).toBe(204);
@@ -111,7 +111,7 @@ describe('4 · Headers', () => {
   });
 
   it('defaults to Cache-Control: no-store for personal responses', async () => {
-    const res = await call('/v1/me', { token: await token('reader') });
+    const res = await call('/v1/echo', { token: await token('reader') });
     expect(res.headers.get('cache-control')).toBe('no-store');
   });
 });
@@ -187,7 +187,9 @@ describe('8 · API schemas', () => {
     expect(res.status).toBe(200);
     expect(String(body.openapi)).toMatch(/^3\./);
     const paths = Object.keys(body.paths);
-    for (const path of ['/v1/products', '/v1/orders', '/v1/webhooks']) expect(paths).toContain(path);
+    expect(paths).toContain('/v1/products');
+    if (built(22)) expect(paths).toContain('/v1/orders');
+    if (built(26)) expect(paths).toContain('/v1/webhooks');
     // The path parameter's name is the implementation's choice: {id}, {productId}, {product_id}.
     expect(paths.some((p) => /^\/v1\/products\/\{\w+\}$/.test(p))).toBe(true);
     const docs = await call('/docs');

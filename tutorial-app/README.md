@@ -1,6 +1,6 @@
 # API Concepts Lab
 
-The 27 API concepts of this repo as a course you can follow on your own. Every concept has three parts:
+The 27 API concepts of this repo as a course you can follow on your own. Every concept has four parts:
 
 1. **Watch**: a narrated video with animated diagrams and the real HTTP messages.
 2. **Learn**: the concept guide from `../docs/concepts`, with the code of all three stacks side by side. Code links open
@@ -8,9 +8,14 @@ The 27 API concepts of this repo as a course you can follow on your own. Every c
 3. **Practice**: steps that send real requests to the Bookshop API on your machine (Python on 8001, TypeScript on 8002,
    C# on 8003), check the answers, show the curl command, open the code that did it, and end with something to build
    yourself.
+4. **Build**: write the concept yourself in your own API
+   ([bookshop-api-handbuilt](https://github.com/abdulhathi/bookshop-api-handbuilt)): what to build, the contract tests
+   that must pass, and `./check.sh <stack> <concept>` to grade it. The Practice tab can also send its requests to your
+   own servers (ports 9001 to 9003) with “My servers”.
 
-Each concept page tracks six study steps: watch, read, practice on one stack, practice on a second, build, and answer the
-interview questions out loud.
+Each concept page tracks six study steps: watch, read, practice on one stack, practice on a second, build it in your own
+API, and answer the interview questions out loud. The dev server reads your repo's `progress.json` (`HANDBUILT_DIR`,
+default `bookshop-api-handbuilt` next to the github-portfolio folder) to tick the build step.
 
 ```bash
 npm install

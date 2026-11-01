@@ -1,19 +1,28 @@
-// The dev server's two jobs for the practice labs:
-//   1. Proxy /stack/<id>/… to the three Bookshop API servers, so lab requests are same-origin.
+// The dev server's jobs for the practice labs:
+//   1. Proxy /stack/<id>/… to the three reference servers, and /mine/<id>/… to your own (the hand-built track),
+//      so lab requests are same-origin.
 //   2. A webhook inbox at /lab/inbox/<box>: the API delivers webhooks here and the lab shows them.
+//   3. GET /lab/build-progress: progress.json of your hand-built API, so the Build tab shows what passed.
+import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { resolve } from 'node:path';
 import type { Plugin, ProxyOptions } from 'vite';
 
 export const STACK_PORTS = { python: 8001, node: 8002, dotnet: 8003 } as const;
+/** Your own servers, built by hand in the bookshop-api-handbuilt repo. */
+export const MINE_PORTS = { python: 9001, node: 9002, dotnet: 9003 } as const;
 
 const SET = 'x-lab-set-';
 
 /** /stack/<id> → the server on its port. The browser's own Origin, Referer and cookies are dropped, and
  *  X-Lab-Set-<name> becomes <name>: that is how a step sends Origin or Access-Control-Request-Method. */
 export function stackProxies(): Record<string, ProxyOptions> {
+  const targets = [
+    ...Object.entries(STACK_PORTS).map(([id, port]) => [`/stack/${id}`, id, port] as const),
+    ...Object.entries(MINE_PORTS).map(([id, port]) => [`/mine/${id}`, id, port] as const),
+  ];
   return Object.fromEntries(
-    Object.entries(STACK_PORTS).map(([id, port]) => {
-      const prefix = `/stack/${id}`;
+    targets.map(([prefix, id, port]) => {
       const options: ProxyOptions = {
         target: `http://127.0.0.1:${port}`,
         changeOrigin: true,
@@ -108,6 +117,31 @@ export function inboxPlugin(): Plugin {
           boxes.set(box, list.slice(-MAX_PER_BOX));
           json(res, answered, answered === 200 ? { received: true } : { error: `failing on purpose: attempt ${tries} of ${fail}` });
         })().catch(() => json(res, 500, { error: 'inbox error' }));
+      });
+    },
+  };
+}
+
+/** Where your hand-built API lives: HANDBUILT_DIR, or bookshop-api-handbuilt next to the github-portfolio folder. */
+export const handbuiltDir = () => process.env.HANDBUILT_DIR ?? resolve(process.cwd(), '../../../bookshop-api-handbuilt');
+
+/** GET /lab/build-progress: the hand-built API's progress.json (404 when the folder is not there). */
+export function buildProgressPlugin(): Plugin {
+  return {
+    name: 'lab-build-progress',
+    configureServer(server) {
+      server.middlewares.use('/lab/build-progress', (req, res) => {
+        void readFile(resolve(handbuiltDir(), 'progress.json'), 'utf8').then(
+          (text) => {
+            try {
+              json(res, 200, { dir: handbuiltDir(), progress: JSON.parse(text) as unknown });
+            } catch {
+              json(res, 500, { error: 'progress.json is not valid JSON' });
+            }
+          },
+          () => json(res, 404, { dir: handbuiltDir(), error: 'No progress.json there yet' }),
+        );
+        void req;
       });
     },
   };

@@ -11,6 +11,10 @@ export type Stack = {
   short: string;
   cloud: string;
   port: number;
+  /** Your own server for this stack, in the hand-built repo. */
+  minePort: number;
+  /** The stack's folder in the hand-built repo (bookshop-api-handbuilt). */
+  mineDir: string;
   /** The stack's folder in APIConcepts/. */
   dir: string;
   /** How to start it from the folder that holds SPEC.md (Study Hub starts it too). Install first: see the stack's README. */
@@ -24,6 +28,8 @@ export const STACKS: Stack[] = [
     short: 'Python',
     cloud: 'AWS',
     port: 8001,
+    minePort: 9001,
+    mineDir: 'python',
     dir: 'python-fastapi-aws',
     start: 'cd python-fastapi-aws && .venv/bin/python -m app',
   },
@@ -33,6 +39,8 @@ export const STACKS: Stack[] = [
     short: 'TypeScript',
     cloud: 'GCP',
     port: 8002,
+    minePort: 9002,
+    mineDir: 'typescript',
     dir: 'node-typescript-gcp',
     start: 'cd node-typescript-gcp && npm run dev',
   },
@@ -42,6 +50,8 @@ export const STACKS: Stack[] = [
     short: 'C#',
     cloud: 'Azure',
     port: 8003,
+    minePort: 9003,
+    mineDir: 'csharp',
     dir: 'dotnet-azure',
     start: 'cd dotnet-azure && dotnet run --project src/ApiConcepts.Api',
   },
@@ -72,26 +82,55 @@ export function useStack(): StackId {
   );
 }
 
+/** Which servers the practice labs talk to: the reference ones, or the ones you are building yourself. */
+export type Target = 'stack' | 'mine';
+const TARGET_KEY = 'api-lab.target';
+let target: Target = readJson<string>(TARGET_KEY, 'stack') === 'mine' ? 'mine' : 'stack';
+const targetListeners = new Set<() => void>();
+
+export function setTarget(t: Target) {
+  target = t;
+  writeJson(TARGET_KEY, t);
+  targetListeners.forEach((l) => l());
+}
+
+export const currentTarget = () => target;
+
+export function useTarget(): Target {
+  return useSyncExternalStore(
+    (l) => {
+      targetListeners.add(l);
+      return () => targetListeners.delete(l);
+    },
+    () => target,
+    () => target,
+  );
+}
+
+/** The port a request goes to: the reference server's, or your own. */
+export const portOf = (stack: StackId, t: Target = target) => (t === 'mine' ? stackOf(stack).minePort : stackOf(stack).port);
+
 export type Health = 'up' | 'down' | 'checking';
 
-/** Whether each server answers GET /health, checked now and every few seconds while mounted. */
-export function useHealth(everyMs = 5000): Record<StackId, Health> {
+/** Whether each server (reference or yours) answers GET /health, checked now and every few seconds while mounted. */
+export function useHealth(everyMs = 5000, t: Target = 'stack'): Record<StackId, Health> {
   const [h, setH] = useState<Record<StackId, Health>>({ python: 'checking', node: 'checking', dotnet: 'checking' });
   useEffect(() => {
     let live = true;
+    setH({ python: 'checking', node: 'checking', dotnet: 'checking' });
     const check = () =>
       STACKS.forEach((s) =>
-        fetch(`/stack/${s.id}/health`, { cache: 'no-store' })
+        fetch(`/${t}/${s.id}/health`, { cache: 'no-store' })
           .then((r) => r.ok)
           .catch(() => false)
           .then((ok) => live && setH((prev) => (prev[s.id] === (ok ? 'up' : 'down') ? prev : { ...prev, [s.id]: ok ? 'up' : 'down' }))),
       );
     check();
-    const t = setInterval(check, everyMs);
+    const timer = setInterval(check, everyMs);
     return () => {
       live = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
-  }, [everyMs]);
+  }, [everyMs, t]);
   return h;
 }
