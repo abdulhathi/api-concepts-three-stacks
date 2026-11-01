@@ -6,11 +6,11 @@ using HotChocolate.Types;
 
 namespace ApiConcepts.Api.GraphQl;
 
-public sealed record PageInfoType(string? EndCursor, bool HasNextPage);
+[GraphQLName("PageInfo")] public sealed record PageInfoType(string? EndCursor, bool HasNextPage);
 
 public sealed record ProductConnection(IReadOnlyList<ProductType> Nodes, PageInfoType PageInfo);
 
-public sealed record ProductType(
+[GraphQLName("Product")] public sealed record ProductType(
     [property: GraphQLType(typeof(NonNullType<IdType>))] string Id,
     string Title,
     string Author,
@@ -21,7 +21,7 @@ public sealed record ProductType(
     public static ProductType From(Product p) => new(p.Id, p.Title, p.Author, p.PriceCents, p.Currency, p.Tags);
 }
 
-public sealed record OrderType(
+[GraphQLName("Order")] public sealed record OrderType(
     [property: GraphQLType(typeof(NonNullType<IdType>))] string Id,
     string Status,
     int TotalCents,
@@ -31,7 +31,7 @@ public sealed record OrderType(
         new(o.Id, o.Status, o.TotalCents, [.. o.Items.Select(i => new OrderItemType(i.ProductId, i.Quantity, i.UnitPriceCents))]);
 }
 
-public sealed class OrderItemType(string productId, int quantity, int unitPriceCents)
+[GraphQLName("OrderItem")] public sealed class OrderItemType(string productId, int quantity, int unitPriceCents)
 {
     public int Quantity { get; } = quantity;
 

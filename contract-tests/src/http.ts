@@ -64,13 +64,36 @@ export async function token(client: string, scope?: string): Promise<string> {
 }
 
 /** Asserts an RFC 9457 problem with the spec's slug, and returns its body. */
+/** One title per problem type, the same in every stack (SPEC.md, Errors). */
+export const TITLES: Record<string, string> = {
+  'validation-error': 'Your request is not valid',
+  'malformed-json': 'The request body is not valid JSON',
+  'invalid-cursor': 'The pagination cursor is not valid',
+  'idempotency-key-required': 'An Idempotency-Key header is required',
+  'unauthorized': 'Authentication is required',
+  'forbidden': 'You are not allowed to do this',
+  'not-found': 'Resource not found',
+  'method-not-allowed': 'Method not allowed',
+  'invalid-state': 'The resource is in a state that does not allow this',
+  'idempotency-key-in-progress': 'A request with this Idempotency-Key is in progress',
+  'precondition-failed': 'The resource changed since you last saw it',
+  'unsupported-media-type': 'Unsupported media type',
+  'unknown-product': 'The order references an unknown product',
+  'idempotency-key-reused': 'This Idempotency-Key was used with a different request',
+  'rate-limited': 'Too many requests',
+  'internal-error': 'Internal server error',
+  'throttled': 'The server is busy',
+  'service-unavailable': 'The service is temporarily unavailable',
+  'timeout': 'The request took too long',
+};
+
 export async function problem(res: Response, status: number, slug: string, path?: string) {
   expect(res.status).toBe(status);
   expect(res.headers.get('content-type') ?? '').toContain('application/problem+json');
   const body = await res.json();
   expect(body.type).toBe(`/problems/${slug}`);
   expect(body.status).toBe(status);
-  expect(typeof body.title).toBe('string');
+  expect(body.title).toBe(TITLES[slug]);
   expect(body.requestId).toBe(res.headers.get('x-request-id'));
   if (path) expect(body.instance).toBe(path);
   return body;

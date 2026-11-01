@@ -126,26 +126,27 @@ Every error (except the OAuth token endpoint, which follows RFC 6749) is `applic
 `X-Request-Id` response header. `errors` is present only for `validation-error`. 500s never leak stack traces or
 exception messages: detail is exactly `An unexpected error occurred.` and the exception is logged with the request ID.
 
-| Slug | Status | When |
-|---|---|---|
-| `validation-error` | 400 | query, path or body fails its schema |
-| `malformed-json` | 400 | body is not JSON |
-| `invalid-cursor` | 400 | cursor cannot be decoded |
-| `idempotency-key-required` | 400 | `POST /v1/orders` without `Idempotency-Key` (1–255 chars) |
-| `unauthorized` | 401 | missing, malformed, expired or badly signed token |
-| `forbidden` | 403 | token lacks the scope |
-| `not-found` | 404 | unknown id, another client's order, or unknown route |
-| `invalid-state` | 409 | state transition not allowed |
-| `idempotency-key-in-progress` | 409 | same key still being processed |
-| `precondition-failed` | 412 | `If-Match` does not match the current ETag |
-| `unsupported-media-type` | 415 | wrong `Content-Type` |
-| `unknown-product` | 422 | order references a product that does not exist |
-| `idempotency-key-reused` | 422 | same key, different request body |
-| `rate-limited` | 429 | bucket empty |
-| `internal-error` | 500 | unhandled exception |
-| `throttled` | 503 | report queue full |
-| `service-unavailable` | 503 | the flaky demo endpoint failing on purpose |
-| `timeout` | 504 | report took longer than `REQUEST_TIMEOUT_MS` |
+| Slug | Status | Title (the same in every stack) | When |
+|---|---|---|---|
+| `validation-error` | 400 | Your request is not valid | query, path or body fails its schema |
+| `malformed-json` | 400 | The request body is not valid JSON | body is not JSON |
+| `invalid-cursor` | 400 | The pagination cursor is not valid | cursor cannot be decoded |
+| `idempotency-key-required` | 400 | An Idempotency-Key header is required | `POST /v1/orders` without `Idempotency-Key` (1–255 chars) |
+| `unauthorized` | 401 | Authentication is required | missing, malformed, expired or badly signed token |
+| `forbidden` | 403 | You are not allowed to do this | token lacks the scope |
+| `not-found` | 404 | Resource not found | unknown id, another client's order, or unknown route |
+| `method-not-allowed` | 405 | Method not allowed | known path, wrong method (optional: a stack may answer 404 `not-found` instead) |
+| `invalid-state` | 409 | The resource is in a state that does not allow this | state transition not allowed |
+| `idempotency-key-in-progress` | 409 | A request with this Idempotency-Key is in progress | same key still being processed |
+| `precondition-failed` | 412 | The resource changed since you last saw it | `If-Match` does not match the current ETag |
+| `unsupported-media-type` | 415 | Unsupported media type | wrong `Content-Type` |
+| `unknown-product` | 422 | The order references an unknown product | order references a product that does not exist |
+| `idempotency-key-reused` | 422 | This Idempotency-Key was used with a different request | same key, different request body |
+| `rate-limited` | 429 | Too many requests | bucket empty |
+| `internal-error` | 500 | Internal server error | unhandled exception |
+| `throttled` | 503 | The server is busy | report queue full |
+| `service-unavailable` | 503 | The service is temporarily unavailable | the flaky demo endpoint failing on purpose |
+| `timeout` | 504 | The request took too long | report took longer than `REQUEST_TIMEOUT_MS` |
 
 401 also sends `WWW-Authenticate: Bearer realm="api-concepts"` (with `, error="invalid_token"` when a token was sent
 but rejected). 403 sends `WWW-Authenticate: Bearer realm="api-concepts", error="insufficient_scope", scope="<needed>"`.
@@ -231,7 +232,7 @@ ETag (or `*`) → 304 with no body, same `ETag` and `Cache-Control`.
 
 **Create** `POST` `{ title, author, priceCents, tags? }` → 201, `Location: /v1/products/<id>`, product body, `ETag`.
 **Replace** `PUT` needs all of `title, author, priceCents, tags`. **Patch** `PATCH` takes any subset.
-**Delete** → 204. PUT, PATCH and DELETE honour `If-Match`: present and not equal to the current ETag → 412
+**Delete** → 204. PUT, PATCH and DELETE honor `If-Match`: present and not equal to the current ETag → 412
 `precondition-failed`. Unknown id → 404.
 
 ### Orders (concepts 11, 22, 26)
@@ -257,7 +258,7 @@ Another client's order (not admin) → 404 everywhere.
 `{ orderCount, paidCount, revenueCents, generatedAt }` over all orders (revenue = sum of paid totals).
 - **Throttling**: at most 2 reports run at once and at most 2 more wait in a FIFO queue. A request that finds 2 running
   and 2 waiting → 503 `throttled` with `Retry-After: 1`, immediately.
-- **Timeout**: if the work takes longer than `REQUEST_TIMEOUT_MS`, cancel it and return 504 `timeout` at that moment.
+- **Timeout**: if the work takes longer than `REQUEST_TIMEOUT_MS`, cancel it and return 504 `timeout` at that moment. The clock starts when the report starts running: time spent waiting in the queue does not count.
 
 ### Flaky and crash demos (concepts 23, 25, 27)
 `GET /v1/demo/flaky?key=<string 1–64>&failTimes=<0–10, default 2>`: counts calls per key; calls 1..failTimes → 503
@@ -314,7 +315,7 @@ Each stack ships a small client library used by its tests and an example script:
 - Fetches a token with client credentials and caches it until 30 s before expiry.
 - Per-attempt timeout (default 5 s).
 - Retries at most 3 times (4 attempts) on network errors, timeouts, 408, 429, 502, 503, 504. Never on other 4xx/5xx.
-- Retries only idempotent methods (GET, HEAD, PUT, DELETE, OPTIONS) or a POST that carries an `Idempotency-Key`;
+- Retries only idempotent methods (GET, HEAD, PUT, DELETE, OPTIONS) or any request that carries an `Idempotency-Key` (in practice a POST, sometimes a PATCH);
   `createOrder` always generates one key (UUID) and reuses it on every attempt.
 - Delay before retry n: `Retry-After` seconds when the response has it, otherwise
   `random(0.5, 1.0) × min(5000, 200 × 2^(n−1))` ms. Both base and cap are options so tests run fast.

@@ -23,7 +23,7 @@ public static class ETags
                tags.Any(tag => tag.Equals(EntityTagHeaderValue.Any) || Same(tag.Tag.ToString(), etag));
     }
 
-    /// <summary>If-Match is a precondition: when present it must match the current ETag.</summary>
+    /// <summary>If-Match is a precondition: when present it must match the current ETag, by strong comparison (a W/ tag never matches).</summary>
     public static void RequireIfMatch(HttpRequest request, string currentEtag)
     {
         var values = request.Headers.IfMatch;
@@ -33,7 +33,7 @@ public static class ETags
         }
 
         var matches = EntityTagHeaderValue.TryParseList(values, out var tags) &&
-                      tags.Any(tag => tag.Equals(EntityTagHeaderValue.Any) || tag.Tag.ToString() == currentEtag);
+                      tags.Any(tag => tag.Equals(EntityTagHeaderValue.Any) || (!tag.IsWeak && tag.Tag.ToString() == currentEtag));
         if (!matches)
         {
             throw new ProblemException(

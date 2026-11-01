@@ -100,6 +100,16 @@ describe('4 · Headers', () => {
     await problem(res, 415, 'unsupported-media-type');
   });
 
+  it('accepts merge patch JSON on PATCH only', async () => {
+    const res = await call('/v1/products', {
+      method: 'POST',
+      token: await token('writer'),
+      headers: { 'content-type': 'application/merge-patch+json' },
+      body: JSON.stringify({ title: 'Merge', author: 'A', priceCents: 1 }),
+    });
+    await problem(res, 415, 'unsupported-media-type');
+  });
+
   it('defaults to Cache-Control: no-store for personal responses', async () => {
     const res = await call('/v1/me', { token: await token('reader') });
     expect(res.headers.get('cache-control')).toBe('no-store');

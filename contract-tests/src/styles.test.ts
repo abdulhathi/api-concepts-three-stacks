@@ -140,6 +140,10 @@ describe('19 · Caching', () => {
     const stale = await call(`/v1/products/${id}`, { method: 'PATCH', token: writer, headers: { 'if-match': `"${id}-v9"` }, body: { priceCents: 2 } });
     await problem(stale, 412, 'precondition-failed');
 
+    // If-Match uses strong comparison (RFC 9110): a weak tag never matches, even with the right value.
+    const weak = await call(`/v1/products/${id}`, { method: 'PATCH', token: writer, headers: { 'if-match': `W/"${id}-v1"` }, body: { priceCents: 2 } });
+    await problem(weak, 412, 'precondition-failed');
+
     const fresh = await call(`/v1/products/${id}`, { method: 'PATCH', token: writer, headers: { 'if-match': `"${id}-v1"` }, body: { priceCents: 2 } });
     expect(fresh.status).toBe(200);
     expect(fresh.headers.get('etag')).toBe(`"${id}-v2"`);

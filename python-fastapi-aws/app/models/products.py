@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from pydantic import AfterValidator, Field, StringConstraints, field_validator
 
-from app.models.base import ApiModel, UtcTimestamp
+from app.models.base import ApiInput, ApiModel, UtcTimestamp
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Author = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
@@ -22,14 +22,14 @@ def _require_unique(tags: list[str]) -> list[str]:
 Tags = Annotated[list[Tag], Field(max_length=10), AfterValidator(_require_unique)]
 
 
-class ProductCreate(ApiModel):
+class ProductCreate(ApiInput):
     title: Title
     author: Author
     price_cents: PriceCents
     tags: Tags = Field(default_factory=list)
 
 
-class ProductReplace(ApiModel):
+class ProductReplace(ApiInput):
     """PUT is a full replace, so every field is required."""
 
     title: Title
@@ -38,7 +38,7 @@ class ProductReplace(ApiModel):
     tags: Tags
 
 
-class ProductPatch(ApiModel):
+class ProductPatch(ApiInput):
     """PATCH takes any subset; only fields present in the body change."""
 
     title: Title | None = None

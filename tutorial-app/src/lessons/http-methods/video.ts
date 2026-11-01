@@ -1,0 +1,580 @@
+import type { VideoScript } from '../../video/types';
+
+export const video: VideoScript = {
+  id: 'http-methods',
+  scenes: [
+    {
+      kind: 'title',
+      title: 'HTTP methods',
+      subtitle: 'The verb of every request: read, create, replace, change or delete.',
+      say: [
+        'This lesson is about HTTP methods: the verb at the start of every request.',
+        'You will see the five methods on one resource, which are safe and which are idempotent, how PUT and PATCH differ, and what HEAD and OPTIONS do.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'When every call is a POST',
+      name: 'all-post',
+      nodes: [
+        { id: 'app', kind: 'client', label: 'Client app', col: 0, row: 1 },
+        { id: 'cache', kind: 'cache', label: 'HTTP cache', sub: 'browser or proxy', col: 2, row: 1 },
+        { id: 'api', kind: 'server', label: 'RPC-style API', sub: 'one POST path', col: 4, row: 1 },
+      ],
+      edges: [
+        { from: 'app', to: 'cache' },
+        { from: 'cache', to: 'api' },
+      ],
+      panels: [{ id: 'calls', title: 'Calls on the wire', col: 2, row: 2.5, width: 270, rows: ['(none yet)'] }],
+      say: [
+        'Picture an API where every call is a POST to one path, and the real action hides in the body: get product, delete product.',
+        'In between sits an HTTP cache, in the browser or a proxy. It can keep answers to GET, but in practice it never keeps answers to POST.',
+        'So the same product, read a thousand times, means a thousand trips to the server.',
+        'Then a call times out. Was it a read or a delete? The method does not say, so the client cannot know if a retry is safe.',
+        'With real methods, the verb is on the outside, where every cache, proxy and client library can read it. A repeated GET comes from the cache.',
+      ],
+      beats: [
+        { send: [{ path: ['app', 'cache', 'api'], label: 'POST getProduct' }], rows: { calls: ['POST /rpc  getProduct'] } },
+        { send: [{ path: ['api', 'cache', 'app'], label: '200 product', tone: 'reply' }], badge: { cache: 'not stored' } },
+        {
+          send: [
+            { path: ['app', 'cache', 'api'], label: 'POST getProduct' },
+            { path: ['app', 'cache', 'api'], label: 'POST getProduct', sameTime: true },
+            { path: ['app', 'cache', 'api'], label: 'POST getProduct', sameTime: true },
+          ],
+          badge: { api: '1000 reads' },
+        },
+        {
+          rows: { calls: ['POST /rpc  getProduct', 'POST /rpc  deleteProduct'] },
+          send: [
+            { path: ['app', 'cache', 'api'], label: 'POST ???' },
+            { path: ['api', 'cache', 'app'], label: '200', tone: 'reply', lost: true },
+          ],
+          badge: { app: 'retry?' },
+        },
+        {
+          relabel: { api: { label: 'Bookshop API', sub: 'real methods' } },
+          rows: { calls: ['GET /v1/products/prd_7'] },
+          send: [
+            { path: ['app', 'cache'], label: 'GET product' },
+            { path: ['cache', 'app'], label: '200 from cache', tone: 'reply' },
+          ],
+          badge: { cache: 'HIT', api: null, app: null },
+          note: 'The method tells every hop what the request does',
+        },
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'One resource, five methods',
+      name: 'five-methods',
+      nodes: [
+        { id: 'app', kind: 'client', label: 'Admin app', col: 0, row: 1 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2.5, row: 1 },
+        { id: 'db', kind: 'db', label: 'Products', sub: 'table', col: 4.5, row: 1 },
+      ],
+      edges: [
+        { from: 'app', to: 'api' },
+        { from: 'api', to: 'db' },
+      ],
+      panels: [{ id: 'table', title: 'Products table', col: 4.5, row: 2.5, width: 280, rows: ['(no lamp yet)'] }],
+      say: [
+        'Here is the idea. Take one resource, a product, and five methods. The path names the thing. The method says what to do with it.',
+        'POST to the products collection creates one. The server picks the id and answers 201 Created.',
+        'GET on that product’s own path reads it. Nothing in the table changes.',
+        'PUT sends the whole product, every field, and the server replaces what it had with exactly that.',
+        'PATCH sends only the fields that change. Here it is just the price. The title stays as it was.',
+        'DELETE removes it. The answer is 204 No Content: done, and nothing to send back.',
+      ],
+      beats: [
+        { focus: ['api'], badge: { api: '5 methods' } },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'POST products' },
+            { path: ['api', 'db'], label: 'INSERT', tone: 'data' },
+            { path: ['api', 'app'], label: '201 Created', tone: 'reply' },
+          ],
+          rows: { table: ['prd_7  Desk Lamp  $15  v1'] },
+          badge: { api: null },
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'GET prd_7' },
+            { path: ['api', 'db'], label: 'SELECT' },
+            { path: ['api', 'app'], label: '200 OK', tone: 'reply' },
+          ],
+          focus: ['table'],
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'PUT prd_7' },
+            { path: ['api', 'db'], label: 'REPLACE', tone: 'data' },
+            { path: ['api', 'app'], label: '200 OK', tone: 'reply' },
+          ],
+          rows: { table: ['prd_7  Lamp 2e    $17  v2'] },
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'PATCH price' },
+            { path: ['api', 'db'], label: 'UPDATE', tone: 'data' },
+            { path: ['api', 'app'], label: '200 OK', tone: 'reply' },
+          ],
+          rows: { table: ['prd_7  Lamp 2e    $18  v3'] },
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'DELETE prd_7' },
+            { path: ['api', 'db'], label: 'DELETE', tone: 'data' },
+            { path: ['api', 'app'], label: '204 No Content', tone: 'reply' },
+          ],
+          rows: { table: ['(no lamp)'] },
+        },
+      ],
+    },
+    {
+      kind: 'pause',
+      title: 'Pause and think',
+      question: 'You want to change only a product’s price. Which method do you send, and why not PUT?',
+      answer: 'PATCH, with just the price. PUT replaces the whole product, so it needs every field.',
+      say: ['You want to change only the price of a product. Which method do you send, and why not PUT?'],
+      answerSay: [
+        'PATCH, with only the new price. The server changes that one field and keeps the rest.',
+        'PUT means replace the whole product, so you would have to send every field. In this API, a PUT with only a price is a 400.',
+      ],
+    },
+    {
+      kind: 'table',
+      title: 'The five methods at a glance',
+      head: ['Method', 'On a product', 'Safe', 'Idempotent', 'Success'],
+      rows: [
+        ['GET', 'read it', 'yes', 'yes', '200'],
+        ['POST', 'create one', 'no', 'no', '201 + Location'],
+        ['PUT', 'replace all of it', 'no', 'yes', '200'],
+        ['PATCH', 'change some fields', 'no', 'not always', '200'],
+        ['DELETE', 'remove it', 'no', 'yes', '204'],
+      ],
+      lead: 1,
+      say: [
+        'Here are the five side by side. Two columns matter most: safe and idempotent.',
+        'GET reads. It is safe and idempotent. Success is 200, or 304 when the client’s copy is still current.',
+        'POST creates. It is neither safe nor idempotent. Success is 201 Created, with a Location header for the new product.',
+        'PUT replaces the whole product. It changes state, so it is not safe, but it is idempotent.',
+        'PATCH changes some fields. Whether it is idempotent depends on the change.',
+        'DELETE removes. It is idempotent, and success is 204, with no body.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'Safe means read-only',
+      name: 'safe',
+      nodes: [
+        { id: 'crawler', kind: 'search', label: 'Web crawler', col: 0, row: 0 },
+        { id: 'admin', kind: 'browser', label: 'Admin page', col: 0, row: 2 },
+        { id: 'api', kind: 'server', label: 'Shop server', col: 2.5, row: 1 },
+        { id: 'db', kind: 'db', label: 'Products', col: 4.5, row: 1 },
+      ],
+      edges: [
+        { from: 'crawler', to: 'api' },
+        { from: 'admin', to: 'api' },
+        { from: 'api', to: 'db' },
+      ],
+      panels: [{ id: 'table', title: 'Products table', col: 4.5, row: 2.4, width: 230, rows: ['prd_7 Desk Lamp', 'prd_8 Desk Chair'] }],
+      say: [
+        'Safe means the client asks for no change. GET is safe, and so are HEAD and OPTIONS.',
+        'Software counts on that. Browsers prefetch links, and crawlers follow every link they find, because a GET should be harmless.',
+        'Now someone adds a quick admin link: a GET on a delete path. One click removes a product.',
+        'A crawler finds the page and follows the next delete link, as crawlers do. Another product is gone, and nobody clicked.',
+        'The rule: reads use GET. Changes use POST, PUT, PATCH or DELETE, which no crawler sends on its own.',
+        'Safe does not mean no work: the server may still log the request. It means the client did not ask for a change.',
+      ],
+      beats: [
+        { badge: { api: 'GET is safe' }, focus: ['api'] },
+        {
+          send: [
+            { path: ['crawler', 'api'], label: 'GET products' },
+            { path: ['api', 'crawler'], label: '200 OK', tone: 'reply' },
+          ],
+        },
+        {
+          send: [
+            { path: ['admin', 'api'], label: 'GET …/delete' },
+            { path: ['api', 'db'], label: 'DELETE', tone: 'data' },
+          ],
+          rows: { table: ['prd_8 Desk Chair'] },
+          badge: { api: null },
+        },
+        {
+          send: [
+            { path: ['crawler', 'api'], label: 'GET …/delete' },
+            { path: ['api', 'db'], label: 'DELETE', tone: 'data' },
+          ],
+          rows: { table: ['(empty)'] },
+          badge: { db: 'emptied' },
+          note: 'A GET that changes state gets called by machines',
+        },
+        { relabel: { api: { sub: 'GET only reads' } }, badge: { crawler: 'GET only' } },
+        { send: [{ path: ['crawler', 'api'], label: 'GET products' }], badge: { api: 'logged' } },
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'Idempotent: the same request twice',
+      name: 'twice',
+      nodes: [
+        { id: 'app', kind: 'client', label: 'Admin app', col: 0, row: 1 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2.5, row: 1 },
+        { id: 'db', kind: 'db', label: 'Products', col: 4.5, row: 1 },
+      ],
+      edges: [
+        { from: 'app', to: 'api' },
+        { from: 'api', to: 'db' },
+      ],
+      panels: [{ id: 'state', title: 'prd_7 on the server', col: 4.5, row: 2.4, width: 260, rows: ['Desk Lamp, $15, v1'] }],
+      say: [
+        'Idempotent means the same request sent twice leaves the server in the same state as sending it once.',
+        'Send a PUT that sets the product to Lamp, second edition, at 17 dollars. The product now looks like that, but the answer is lost.',
+        'So the client sends the same PUT again. The product still looks exactly the same.',
+        'This API counts every write, so the version went from 2 to 3. That is bookkeeping, not the change the client asked for.',
+        'Now DELETE. The first one removes the product and answers 204.',
+        'The second answers 404, because nothing is left. A different answer, but the same state: the product is gone.',
+        'That is why a client may retry GET, PUT and DELETE after a timeout.',
+      ],
+      beats: [
+        { focus: ['state'] },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'PUT prd_7' },
+            { path: ['api', 'db'], label: 'REPLACE', tone: 'data' },
+            { path: ['api', 'app'], label: '200 OK', tone: 'reply', lost: true },
+          ],
+          rows: { state: ['Lamp 2e, $17, v2'] },
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'PUT prd_7' },
+            { path: ['api', 'db'], label: 'REPLACE', tone: 'data' },
+            { path: ['api', 'app'], label: '200 OK', tone: 'reply' },
+          ],
+          rows: { state: ['Lamp 2e, $17, v3'] },
+          badge: { app: 'retried' },
+        },
+        { focus: ['state'], badge: { db: 'same fields' } },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'DELETE prd_7' },
+            { path: ['api', 'db'], label: 'DELETE', tone: 'data' },
+            { path: ['api', 'app'], label: '204 No Content', tone: 'reply' },
+          ],
+          rows: { state: ['(gone)'] },
+          badge: { db: null, app: null },
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'DELETE prd_7' },
+            { path: ['api', 'app'], label: '404 Not Found', tone: 'fail' },
+          ],
+          focus: ['state'],
+        },
+        { badge: { app: 'can retry' } },
+      ],
+    },
+    {
+      kind: 'http',
+      title: 'PUT sends every field',
+      request: [
+        'PUT /v1/products/prd_01 HTTP/1.1',
+        'Authorization: Bearer eyJhbGciOi…',
+        'Content-Type: application/json',
+        '',
+        '{"title":"HTTP from the Ground Up",',
+        ' "author":"Maya Chen",',
+        ' "priceCents":2999,',
+        ' "tags":["http","basics"]}',
+      ],
+      response: [
+        'HTTP/1.1 200 OK',
+        'ETag: "prd_01-v2"',
+        'Content-Type: application/json',
+        '',
+        '{"id":"prd_01","priceCents":2999,',
+        ' "version":2, …}',
+      ],
+      responseAt: 2,
+      marks: [{ req: [0] }, { req: [4, 5, 6, 7] }, { res: [0, 1, 4, 5] }, { req: [4, 5, 6, 7] }],
+      say: [
+        'Here is a PUT on the wire. The method and the path come first: replace this one product.',
+        'The body is the whole product: title, author, price and tags. Every field, even the ones that did not change.',
+        'The server answers 200 OK with the product as it is now. The version is 2, and the ETag says the same.',
+        'Leave a field out, and this API answers 400, a validation error with one entry per missing field.',
+      ],
+    },
+    {
+      kind: 'http',
+      title: 'PATCH sends only the change',
+      request: [
+        'PATCH /v1/products/prd_01 HTTP/1.1',
+        'Authorization: Bearer eyJhbGciOi…',
+        'Content-Type: application/merge-patch+json',
+        '',
+        '{"priceCents":3000}',
+      ],
+      response: [
+        'HTTP/1.1 200 OK',
+        'ETag: "prd_01-v3"',
+        '',
+        '{"id":"prd_01",',
+        ' "title":"HTTP from the Ground Up",',
+        ' "priceCents":3000,"version":3, …}',
+      ],
+      responseAt: 2,
+      marks: [{ req: [0, 4] }, { req: [2] }, { res: [0, 4, 5] }, { req: [4] }],
+      say: [
+        'PATCH sends only what changes. Here that is one field: the price, 30 dollars.',
+        'The Content-Type can be plain JSON or merge patch JSON, a format made for this: the fields you send replace the old values, and the rest stay.',
+        'The answer is the whole product. The title came through untouched, and the version went up by one.',
+        'Is PATCH idempotent? Not by definition. A PATCH that sets the price to 30 dollars can be repeated safely. One that adds one to a stock count cannot: each repeat adds one more.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'POST twice makes two',
+      name: 'post-twice',
+      nodes: [
+        { id: 'app', kind: 'client', label: 'Admin app', col: 0, row: 1 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2.5, row: 1 },
+        { id: 'db', kind: 'db', label: 'Products', col: 4.5, row: 1 },
+      ],
+      edges: [
+        { from: 'app', to: 'api' },
+        { from: 'api', to: 'db' },
+      ],
+      panels: [{ id: 'table', title: 'Products table', col: 4.5, row: 2.4, width: 260, rows: ['(no lamp yet)'] }],
+      say: [
+        'POST asks a collection to create something new, and the server picks the new id.',
+        'The API creates product A and answers 201 Created, with a Location header that points at it.',
+        'Send exactly the same POST again. The API cannot tell it is a repeat, so it creates product B, with a new id.',
+        'Same request, two products. That is what not idempotent means.',
+        'After a timeout, the client cannot know whether the first create worked. A blind retry makes a duplicate.',
+        'For creates that must happen once, like orders, the fix is an Idempotency-Key header. It has its own lesson.',
+      ],
+      beats: [
+        { send: [{ path: ['app', 'api'], label: 'POST products' }] },
+        {
+          send: [
+            { path: ['api', 'db'], label: 'INSERT', tone: 'data' },
+            { path: ['api', 'app'], label: '201 prd_a1', tone: 'reply' },
+          ],
+          rows: { table: ['prd_a1 Desk Lamp $15'] },
+        },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'POST products' },
+            { path: ['api', 'db'], label: 'INSERT', tone: 'data' },
+            { path: ['api', 'app'], label: '201 prd_b2', tone: 'reply' },
+          ],
+          rows: { table: ['prd_a1 Desk Lamp $15', 'prd_b2 Desk Lamp $15'] },
+          badge: { db: '2 lamps' },
+        },
+        { focus: ['table'], note: 'Same request twice: two new products' },
+        {
+          send: [
+            { path: ['app', 'api'], label: 'POST products' },
+            { path: ['api', 'db'], label: 'INSERT', tone: 'data' },
+            { path: ['api', 'app'], label: '201 prd_c3', tone: 'reply', lost: true },
+          ],
+          rows: { table: ['prd_a1 Desk Lamp $15', 'prd_b2 Desk Lamp $15', 'prd_c3 Desk Lamp $15'] },
+          badge: { app: 'retry?', db: '3 lamps' },
+        },
+        { badge: { app: 'use a key' } },
+      ],
+    },
+    {
+      kind: 'http',
+      title: 'HEAD: the headers without the body',
+      request: ['HEAD /v1/products/prd_01 HTTP/1.1', 'Authorization: Bearer eyJhbGciOi…'],
+      response: [
+        'HTTP/1.1 200 OK',
+        'Content-Type: application/json',
+        'Content-Length: 220',
+        'ETag: "prd_01-v1"',
+        'Cache-Control: private, max-age=60',
+        '',
+        '(no body)',
+      ],
+      responseAt: 0,
+      marks: [{ req: [0], res: [0, 1, 2, 3, 4, 6] }, { res: [0, 2] }, { res: [3] }],
+      say: [
+        'HEAD is GET without the body. The server sends the status and the headers a GET would send, and stops there.',
+        'So a client can ask cheap questions. Does this product exist? How big is it?',
+        'Has it changed since I last read it? The ETag answers that without downloading anything.',
+        'Here the three stacks differ. Express answers HEAD for every GET route on its own. FastAPI answers 405 and ASP.NET Core answers 404, because neither adds HEAD for you.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'OPTIONS: the browser asks first',
+      name: 'preflight',
+      nodes: [
+        { id: 'page', kind: 'browser', label: 'Admin page', sub: 'another origin', col: 0, row: 1 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 3, row: 1 },
+      ],
+      edges: [{ from: 'page', to: 'api' }],
+      panels: [{ id: 'answer', title: 'Preflight answer', col: 1.5, row: 2.5, width: 300, rows: ['(not asked yet)'] }],
+      say: [
+        'OPTIONS asks a server what it allows. You rarely send it by hand. Browsers send it for you.',
+        'A web page from another origin wants to DELETE a product. Before it sends that, the browser asks with OPTIONS. This is called a preflight.',
+        'The API answers: this origin may use GET, POST, PUT, PATCH and DELETE, and may send these headers. The browser may remember that for 10 minutes.',
+        'Only then does the browser send the real DELETE, with the admin token.',
+        'OPTIONS is safe and idempotent. All three stacks answer preflights, and the CORS lesson covers the rules.',
+      ],
+      beats: [
+        { focus: ['page'] },
+        { send: [{ path: ['page', 'api'], label: 'OPTIONS prd_7' }], badge: { page: 'waiting' } },
+        {
+          send: [{ path: ['api', 'page'], label: 'allowed', tone: 'reply' }],
+          rows: { answer: ['Allow-Origin: the admin page', 'Allow-Methods: GET … DELETE', 'Max-Age: 600 seconds'] },
+        },
+        {
+          send: [
+            { path: ['page', 'api'], label: 'DELETE prd_7' },
+            { path: ['api', 'page'], label: '204 No Content', tone: 'reply' },
+          ],
+          badge: { page: null },
+        },
+        { badge: { api: 'safe' }, focus: ['answer'] },
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'Misuse: PUT for a small change',
+      name: 'put-misuse',
+      nodes: [
+        { id: 'app', kind: 'client', label: 'Admin app', col: 0, row: 1 },
+        { id: 'other', kind: 'server', label: 'Careless API', sub: 'no field checks', col: 2.5, row: 0 },
+        { id: 'ours', kind: 'server', label: 'Bookshop API', sub: 'checks every field', col: 2.5, row: 2, hidden: true },
+      ],
+      edges: [
+        { from: 'app', to: 'other' },
+        { from: 'app', to: 'ours', hidden: true },
+      ],
+      panels: [
+        {
+          id: 'theirs',
+          title: 'Their copy of prd_01',
+          col: 4.75,
+          row: 0,
+          width: 240,
+          rows: ['title: HTTP from the…', 'author: Maya Chen', 'priceCents: 3499', 'tags: http, basics'],
+        },
+        {
+          id: 'mine',
+          title: 'Our copy of prd_01',
+          col: 4.75,
+          row: 2,
+          width: 240,
+          hidden: true,
+          rows: ['title: HTTP from the…', 'author: Maya Chen', 'priceCents: 3499', 'tags: http, basics'],
+        },
+      ],
+      say: [
+        'Now the most common misuse. A client wants to change only the price, so it sends PUT with just the price.',
+        'A careless server stores the body it got as the whole product. The title, the author and the tags are gone.',
+        'And it answers 200 OK, so nobody notices until a customer sees a book with no title.',
+        'This API checks first. The same PUT gets 400, a validation error that lists title, author and tags as required.',
+        'Nothing is lost. The client fixes the call by sending PATCH, which changes the price and keeps everything else.',
+      ],
+      beats: [
+        { send: [{ path: ['app', 'other'], label: 'PUT price only' }] },
+        {
+          rows: { theirs: ['title: (missing)', 'author: (missing)', 'priceCents: 3000', 'tags: (missing)'] },
+          badge: { other: 'data lost' },
+          focus: ['theirs'],
+        },
+        { send: [{ path: ['other', 'app'], label: '200 OK', tone: 'reply' }], note: 'Silent data loss: the answer looked fine' },
+        {
+          show: ['ours', 'app-ours', 'mine'],
+          send: [
+            { path: ['app', 'ours'], label: 'PUT price only' },
+            { path: ['ours', 'app'], label: '400 3 fields', tone: 'fail' },
+          ],
+        },
+        {
+          send: [
+            { path: ['app', 'ours'], label: 'PATCH price' },
+            { path: ['ours', 'app'], label: '200 OK', tone: 'reply' },
+          ],
+          rows: { mine: ['title: HTTP from the…', 'author: Maya Chen', 'priceCents: 3000', 'tags: http, basics'] },
+        },
+      ],
+    },
+    {
+      kind: 'signals',
+      title: 'Which method to reach for',
+      lead: 1,
+      rows: [
+        { see: 'Read, list or search', think: 'GET: safe and cacheable' },
+        { see: 'Create; the server picks the id', think: 'POST, 201 and Location' },
+        { see: 'Save the whole form', think: 'PUT with every field' },
+        { see: 'Change one or two fields', think: 'PATCH' },
+        { see: 'Does it exist? Did it change?', think: 'HEAD' },
+      ],
+      say: [
+        'Here is how to pick a method in a design review or an interview.',
+        'When you only read, list or search, use GET. It is safe, so caches and retries can help you.',
+        'When the client creates something and the server picks the id, use POST, and answer 201 with a Location header.',
+        'When the client saves the whole resource at once, use PUT, with every field.',
+        'When it changes one or two fields, use PATCH.',
+        'And when the client only needs to know whether something exists or has changed, HEAD gives the headers without the body.',
+      ],
+    },
+    {
+      kind: 'points',
+      title: 'Common mistakes',
+      tone: 'warn',
+      points: [
+        'A GET that changes state',
+        'PUT for a partial update',
+        'Retrying a POST blindly',
+        'DELETE that answers 200 with nothing',
+      ],
+      say: [
+        'A GET that changes something. Crawlers, prefetchers and caches will call it for you.',
+        'PUT for a partial update. A client that sends one field wipes the rest, or gets a 400 here.',
+        'Retrying a POST after a timeout without an idempotency key. The first one may have worked.',
+        'And a DELETE that answers 200 with an empty body. Use 204 No Content: done, and nothing to show.',
+      ],
+    },
+    {
+      kind: 'pause',
+      title: 'Pause and think',
+      question: 'The second DELETE of the same product answered 404, not 204. Is DELETE still idempotent?',
+      answer: 'Yes. Idempotent is about the state on the server, not the response. After one DELETE or ten, the product is gone.',
+      say: ['You delete a product, then send the same DELETE again. The second one answers 404, not 204. Is DELETE still idempotent?'],
+      answerSay: [
+        'Yes. Idempotent is about the state on the server, not about the response.',
+        'After one DELETE or ten, the product is gone. The 404 only tells you it was already gone.',
+      ],
+    },
+    {
+      kind: 'recap',
+      title: 'Recap',
+      points: [
+        'The method is the verb; the path is the noun',
+        'Safe: GET, HEAD and OPTIONS ask for no change',
+        'Idempotent: GET, PUT, DELETE, HEAD, OPTIONS',
+        'PUT replaces with every field; PATCH changes some',
+        'POST creates, so a repeat creates again',
+      ],
+      next: 'headers',
+      lead: 1,
+      say: [
+        'Let us recap.',
+        'The method says what to do. The path says to what.',
+        'Safe methods, GET, HEAD and OPTIONS, ask for no change, so machines may call them freely.',
+        'Idempotent methods land in the same state when repeated: GET, PUT, DELETE, HEAD and OPTIONS.',
+        'PUT replaces the whole resource and needs every field. PATCH changes only what you send.',
+        'POST creates, so each repeat creates again. Now open the practice tab and send all five to a real server, then watch the next lesson: headers.',
+      ],
+    },
+  ],
+};

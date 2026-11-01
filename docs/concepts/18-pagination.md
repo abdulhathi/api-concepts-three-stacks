@@ -10,7 +10,7 @@ Pagination splits a long list into pages, and the client asks for the next page 
 
 ## How it works
 
-Keyset (cursor) pagination sorts by a stable key, here `(createdAt, id)`. The server returns the page and an opaque cursor that encodes the last key it returned. The next request means "give me items strictly after this key". Adding new items never shifts earlier pages. To know whether another page exists without counting, the server fetches one extra row. The client follows the `Link` header (RFC 8288) with `rel="next"` or reads `nextCursor`.
+Keyset (cursor) pagination sorts by a stable key, here `(createdAt, id)`. The server returns the page and an opaque cursor that encodes the last key it returned. The next request means "give me items strictly after this key". Adding new items never shifts earlier pages. To know whether another page exists without counting, the Python and C# servers fetch one extra row (`limit + 1`); the TypeScript server slices its in-memory sorted list, so it can simply look one item further. The client follows the `Link` header (RFC 8288) with `rel="next"` or reads `nextCursor`.
 
 ```http
 GET /v1/products?limit=2 HTTP/1.1

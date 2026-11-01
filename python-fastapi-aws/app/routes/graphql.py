@@ -38,7 +38,11 @@ async def graphql(
         context_value=Context(container, principal),
     )
     payload: dict[str, Any] = {}
-    if result.data is not None or not result.errors:
+    # An error with a path happened during execution, so the spec wants "data" (null if the root
+    # failed).
+    # Errors without a path stopped the request before execution: then "data" is left out.
+    executed = result.data is not None or any(error.path for error in result.errors or [])
+    if executed or not result.errors:
         payload["data"] = result.data
     if result.errors:
         payload["errors"] = [error.formatted for error in result.errors]

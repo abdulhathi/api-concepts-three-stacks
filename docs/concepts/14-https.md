@@ -37,7 +37,7 @@ Referrer-Policy: no-referrer
 - The apps speak plain HTTP on their port. TLS ends at the cloud edge, as each stack's README explains.
 - When the request arrived over HTTPS (the socket is TLS, or `X-Forwarded-Proto: https`), the response has `Strict-Transport-Security: max-age=31536000; includeSubDomains`.
 - Plain HTTP never gets HSTS. A browser ignores it there anyway, and sending it would be a misleading signal.
-- Only the first value of a comma-separated `X-Forwarded-Proto` is read, because each proxy hop can append to it.
+- Only the first value of a comma-separated `X-Forwarded-Proto` is read, because each proxy hop can append to it. That is fine here, because only HSTS depends on it. A client can set the header itself, so never base a security decision on it unless your own edge overwrites it, or you read the value your trusted proxy added (ASP.NET Core's forwarded-headers middleware reads from the right for that reason).
 
 ## Side by side
 

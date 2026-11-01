@@ -144,6 +144,6 @@ sam delete
 ## Interpretations of the spec
 
 - A wrong method on a known path answers 405 with a `method-not-allowed` problem (not in the spec's slug table).
-- The `invalid-state` slug exists in the catalogue but no endpoint raises it (paying twice is a 200 no-op).
+- The `invalid-state` slug exists in the catalog but no endpoint raises it (paying twice is a 200 no-op).
 - Authentication runs before request-body validation, so an unauthenticated request with a bad body gets 401.
 - A webhook delivery that succeeds after failures clears `lastError` and shows the last attempt's status code.

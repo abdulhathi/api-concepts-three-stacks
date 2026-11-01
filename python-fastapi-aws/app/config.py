@@ -19,6 +19,11 @@ class Settings:
     webhook_retry_base_ms: int = 500
     webhook_max_attempts: int = 5
 
+    def __post_init__(self) -> None:
+        # HS256 needs a key at least as long as its 256-bit output (RFC 7518, section 3.2).
+        if len(self.jwt_secret.encode()) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 bytes")
+
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "Settings":
         env = os.environ if env is None else env

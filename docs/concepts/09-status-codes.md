@@ -49,7 +49,7 @@ Every error body also has a problem `type` slug. The full list is in [27 · Erro
 ## Side by side
 
 ### Python · FastAPI
-One catalogue maps each problem slug to a status and title, so a status is never typed twice. Python and C# also define a `405 method-not-allowed` entry that the spec table does not list.
+One catalog maps each problem slug to a status and title, so a status is never typed twice. Python and C# also define `405 method-not-allowed`, which the spec lists as optional; Python sends it, while TypeScript and C# answer a wrong method with 404.
 
 ```python
     "unauthorized": (401, "Authentication is required"),
@@ -68,14 +68,14 @@ The same table as a typed record. A slug that is not in the union cannot compile
 
 ```ts
   unauthorized: { status: 401, title: 'Authentication is required' },
-  forbidden: { status: 403, title: 'You do not have permission to do this' },
-  'not-found': { status: 404, title: 'The resource was not found' },
-  'invalid-state': { status: 409, title: 'The resource is not in a state that allows this' },
-  'idempotency-key-in-progress': { status: 409, title: 'A request with this Idempotency-Key is still being processed' },
-  'precondition-failed': { status: 412, title: 'The resource has changed since you last read it' },
-  'unsupported-media-type': { status: 415, title: 'The content type is not supported' },
-  'unknown-product': { status: 422, title: 'The order references a product that does not exist' },
-  'idempotency-key-reused': { status: 422, title: 'This Idempotency-Key was already used with a different request' },
+  forbidden: { status: 403, title: 'You are not allowed to do this' },
+  'not-found': { status: 404, title: 'Resource not found' },
+  'invalid-state': { status: 409, title: 'The resource is in a state that does not allow this' },
+  'idempotency-key-in-progress': { status: 409, title: 'A request with this Idempotency-Key is in progress' },
+  'precondition-failed': { status: 412, title: 'The resource changed since you last saw it' },
+  'unsupported-media-type': { status: 415, title: 'Unsupported media type' },
+  'unknown-product': { status: 422, title: 'The order references an unknown product' },
+  'idempotency-key-reused': { status: 422, title: 'This Idempotency-Key was used with a different request' },
   'rate-limited': { status: 429, title: 'Too many requests' },
 ```
 [`src/http/problem.ts` lines 29-38](../../node-typescript-gcp/src/http/problem.ts#L29-L38)
@@ -85,12 +85,12 @@ Each problem type is a static record holding slug, status and title.
 
 ```csharp
     public static readonly ProblemType Unauthorized = new("unauthorized", 401, "Authentication is required");
-    public static readonly ProblemType Forbidden = new("forbidden", 403, "You do not have permission to do that");
+    public static readonly ProblemType Forbidden = new("forbidden", 403, "You are not allowed to do this");
     public static readonly ProblemType NotFound = new("not-found", 404, "Resource not found");
     public static readonly ProblemType MethodNotAllowed = new("method-not-allowed", 405, "Method not allowed");
-    public static readonly ProblemType InvalidState = new("invalid-state", 409, "The resource is not in a valid state for this action");
-    public static readonly ProblemType IdempotencyKeyInProgress = new("idempotency-key-in-progress", 409, "A request with this Idempotency-Key is still being processed");
-    public static readonly ProblemType PreconditionFailed = new("precondition-failed", 412, "The resource has changed");
+    public static readonly ProblemType InvalidState = new("invalid-state", 409, "The resource is in a state that does not allow this");
+    public static readonly ProblemType IdempotencyKeyInProgress = new("idempotency-key-in-progress", 409, "A request with this Idempotency-Key is in progress");
+    public static readonly ProblemType PreconditionFailed = new("precondition-failed", 412, "The resource changed since you last saw it");
     public static readonly ProblemType UnsupportedMediaType = new("unsupported-media-type", 415, "Unsupported media type");
 ```
 [`src/ApiConcepts.Api/Common/ProblemTypes.cs` lines 10-17](../../dotnet-azure/src/ApiConcepts.Api/Common/ProblemTypes.cs#L10-L17)

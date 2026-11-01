@@ -13,7 +13,12 @@ RFC 9457 errors. It is built three times, once in each stack and cloud:
 | **C# · .NET 9 Minimal APIs** | Azure App Service (Bicep) | [`dotnet-azure/`](dotnet-azure/) | 75 |
 
 All three follow one written contract, [`SPEC.md`](SPEC.md), and one black-box test suite,
-[`contract-tests/`](contract-tests/), proves it: the same 58 HTTP tests pass against every server.
+[`contract-tests/`](contract-tests/), proves it: the same 59 HTTP tests pass against every server.
+
+**Learn it:** [`tutorial-app/`](tutorial-app/) is the **API Concepts Lab**, a course built on this code. Each concept
+has a narrated video with animated diagrams (about 11 minutes, 27 in all), the concept guide, and a practice lab that
+sends real requests to the three running servers, checks the answers, opens the code that handled them, and ends with
+a change to build yourself.
 
 ## The 27 concepts
 
@@ -104,10 +109,10 @@ cd node-typescript-gcp && npm test                 # 81 tests
 cd dotnet-azure && dotnet test                     # 75 tests
 
 cd contract-tests && npm install
-./run.sh python && ./run.sh node && ./run.sh dotnet   # the same 58 tests against each server
+./run.sh python && ./run.sh node && ./run.sh dotnet   # the same 59 tests against each server
 ```
 
-[GitHub Actions](.github/workflows/ci.yml) runs every stack's tests and the contract suite on each push.
+[GitHub Actions](.github/workflows/ci.yml) runs every stack's tests, the contract suite and the lab's tests on each push.
 
 ## Deploy it
 
@@ -142,6 +147,7 @@ python-fastapi-aws/      FastAPI app, typed client, pytest suite, AWS SAM templa
 node-typescript-gcp/     Express 5 app, typed client, Vitest suite, Dockerfile, Cloud Run scripts
 dotnet-azure/            Minimal API app, typed client, xUnit suite, Bicep template
 contract-tests/          one black-box suite run against every server
+tutorial-app/            the API Concepts Lab: videos, guides and live practice for all 27 concepts
 ```
 
 ## Credits

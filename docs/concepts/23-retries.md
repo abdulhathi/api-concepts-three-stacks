@@ -25,7 +25,7 @@ HTTP/1.1 200 OK                           <- attempt 3
 
 - Retries live in each stack's typed client, not the server. Up to 3 retries (4 attempts).
 - Retry on network errors, timeouts, 408, 429, 502, 503, 504. Never on other 4xx or 5xx.
-- Retry only GET, HEAD, PUT, DELETE, OPTIONS, or a POST that carries an `Idempotency-Key`. `createOrder` makes one UUID key and reuses it on every attempt.
+- Retry only GET, HEAD, PUT, DELETE, OPTIONS, or a request (usually a POST) that carries an `Idempotency-Key`. `createOrder` makes one UUID key and reuses it on every attempt.
 - When it gives up, the client throws a typed error that carries the problem details.
 
 ## Side by side

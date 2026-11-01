@@ -39,7 +39,7 @@ Content-Type: application/problem+json
 ## Side by side
 
 ### Python · FastAPI
-The ownership rule is one small helper. It raises the same `not-found` problem for "missing" and "not yours". The scope check is in `app/auth/dependencies.py` ([line 58](../../python-fastapi-aws/app/auth/dependencies.py#L58)).
+The ownership rule is one small helper. It raises the same `not-found` problem for "missing" and "not yours". The scope check is in `app/auth/dependencies.py` ([line 62](../../python-fastapi-aws/app/auth/dependencies.py#L62)).
 
 ```python
 async def _visible_order(container: Container, principal: Principal, order_id: str) -> Order:

@@ -1,0 +1,485 @@
+import type { VideoScript } from '../../video/types';
+
+export const video: VideoScript = {
+  id: 'rate-limiting',
+  scenes: [
+    {
+      kind: 'title',
+      title: 'Rate limiting',
+      subtitle: 'Give each client a fair share of requests, and tell it exactly when to come back.',
+      say: [
+        'This lesson is about rate limiting: capping how many requests one client may send in a period of time.',
+        'You will see why every public API needs one, how a token bucket works, and the headers that tell a client when to come back.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'One client uses everything',
+      name: 'greedy-client',
+      nodes: [
+        { id: 'shop', kind: 'phone', label: 'Shop app', col: 0, row: 0 },
+        { id: 'script', kind: 'client', label: 'Buggy script', col: 0, row: 1 },
+        { id: 'partner', kind: 'client', label: 'Partner', col: 0, row: 2 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2, row: 1 },
+        { id: 'db', kind: 'db', label: 'Database', col: 4, row: 1 },
+      ],
+      edges: [
+        { from: 'shop', to: 'api' },
+        { from: 'script', to: 'api' },
+        { from: 'partner', to: 'api' },
+        { from: 'api', to: 'db' },
+      ],
+      say: [
+        'Three clients share the Bookshop API: the shop app, a partner, and a script that someone wrote last night.',
+        'The script has a bug. It calls the products endpoint in a tight loop, as fast as it can.',
+        'Every call is a real database query, so the database now spends almost all its time on the script.',
+        'The shop app asks for one product page. It waits in line behind the script, and its answer never arrives in time.',
+        'The partner gets errors, and the cloud bill goes up. One client used everything, and nobody broke a rule, because there was no rule.',
+      ],
+      beats: [
+        {
+          send: [
+            { path: ['shop', 'api'], label: 'GET product' },
+            { path: ['script', 'api'], label: 'GET products', sameTime: true },
+            { path: ['partner', 'api'], label: 'GET orders', sameTime: true },
+          ],
+        },
+        {
+          badge: { script: 'loop' },
+          send: [
+            { path: ['script', 'api'], label: 'GET products' },
+            { path: ['script', 'api'], label: 'GET products' },
+            { path: ['script', 'api'], label: 'GET products' },
+          ],
+        },
+        {
+          badge: { db: 'busy 100%' },
+          send: [
+            { path: ['api', 'db'], label: 'SELECT', tone: 'data' },
+            { path: ['api', 'db'], label: 'SELECT', tone: 'data' },
+            { path: ['api', 'db'], label: 'SELECT', tone: 'data' },
+          ],
+        },
+        {
+          badge: { shop: 'timeout' },
+          send: [
+            { path: ['shop', 'api'], label: 'GET product' },
+            { path: ['api', 'shop'], label: '200 OK', tone: 'reply', lost: true },
+          ],
+        },
+        { badge: { api: 'bill rising' }, send: [{ path: ['api', 'partner'], label: '500 error', tone: 'fail' }], note: 'One client, no limit: everyone else pays' },
+      ],
+    },
+    {
+      kind: 'points',
+      title: 'Why limit',
+      tone: 'key',
+      lead: 1,
+      points: [
+        'Fairness: one client cannot starve the rest',
+        'Cost: every request spends compute you pay for',
+        'Abuse: guessing and scraping become slow and expensive',
+      ],
+      say: [
+        'So there are three reasons to limit.',
+        'Fairness. A bug or a greedy client in one place should not slow down every other client.',
+        'Cost. Every request uses compute, database time and bandwidth, and you pay for all of it.',
+        'Abuse. Password guessing, scraping and token abuse are free to try without a limit. With one, they become slow and expensive.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'The idea: count per client, refuse early',
+      name: 'limiter-in-front',
+      nodes: [
+        { id: 'shop', kind: 'phone', label: 'Shop app', col: 0, row: 0 },
+        { id: 'script', kind: 'client', label: 'Buggy script', col: 0, row: 2 },
+        { id: 'limit', kind: 'gateway', label: 'Rate limiter', col: 2, row: 1 },
+        { id: 'api', kind: 'server', label: 'Handlers', col: 4, row: 1 },
+      ],
+      edges: [
+        { from: 'shop', to: 'limit' },
+        { from: 'script', to: 'limit' },
+        { from: 'limit', to: 'api' },
+      ],
+      panels: [{ id: 'counts', title: 'Allowance left', col: 2, row: 2.55, width: 230, rows: ['shop app: 1000', 'script: 1000'] }],
+      say: [
+        'Here is the core idea. Put a limiter in front of the work. It sees every request before any handler runs.',
+        'First it asks: who is this? In this API, the answer is the client id inside the access token.',
+        'Each client has its own allowance. The shop app has plenty left, so its request goes on to the handler.',
+        'The script has used its whole allowance for now. Its next request is refused right at the front, with 429 Too Many Requests.',
+        'That refusal costs almost nothing: no query and no database time. The shop app is not affected, and the 429 tells the script when to come back.',
+      ],
+      beats: [
+        { focus: ['limit'] },
+        { send: [{ path: ['shop', 'limit'], label: 'token: shop app' }], focus: ['counts'] },
+        { send: [{ path: ['limit', 'api'], label: 'GET product' }], rows: { counts: ['shop app: 999', 'script: 1000'] } },
+        {
+          rows: { counts: ['shop app: 999', 'script: 0'] },
+          send: [
+            { path: ['script', 'limit'], label: 'token: script' },
+            { path: ['limit', 'script'], label: '429', tone: 'fail' },
+          ],
+        },
+        {
+          send: [
+            { path: ['shop', 'limit', 'api'], label: 'GET product' },
+            { path: ['limit', 'script'], label: '429', tone: 'fail', sameTime: true },
+          ],
+          rows: { counts: ['shop app: 998', 'script: 0'] },
+          badge: { script: 'Retry-After' },
+        },
+      ],
+    },
+    {
+      kind: 'pause',
+      title: 'Pause and think',
+      question: 'Client A sends 10 requests a second, client B sends 1. The server can handle 8. Who should get the 429s?',
+      answer: 'Client A. Limits are per client, so B stays inside its share and is never refused because A is greedy.',
+      say: ['Client A sends 10 requests a second. Client B sends 1. The server can handle 8 a second in total. Who should get the 429 answers?'],
+      answerSay: ['Client A. Limits are counted per client, so B stays well inside its own share, and B is never refused because A is greedy.'],
+    },
+    {
+      kind: 'table',
+      title: 'Three ways to count',
+      head: ['Algorithm', 'How it counts', 'Bursts'],
+      rows: [
+        ['Fixed window', 'a counter per minute, reset on the minute', 'up to 2x the limit at the edge'],
+        ['Sliding window', 'requests in the last 60 seconds', 'smooth; more memory'],
+        ['Token bucket', 'tokens that refill at a steady rate', 'up to the bucket size'],
+      ],
+      lead: 1,
+      say: [
+        'There are three common ways to count.',
+        'A fixed window keeps one counter per client per minute, and sets it back to zero when the minute changes. It is simple, but it has a weak edge.',
+        'A sliding window counts the requests in the last 60 seconds, at every moment. It is exact with a log of timestamps, or close enough with two counters.',
+        'A token bucket gives each client a bucket of tokens that refills at a steady rate. Each request spends one token. This API uses the token bucket.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'The weak edge of a fixed window',
+      name: 'fixed-window',
+      nodes: [
+        { id: 'script', kind: 'client', label: 'Script', col: 0, row: 1 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2, row: 1 },
+      ],
+      edges: [{ from: 'script', to: 'api' }],
+      panels: [{ id: 'win', title: 'Limit: 5 a minute', col: 4, row: 1, width: 230, rows: ['window: 12:00', 'count: 0 of 5'] }],
+      say: [
+        'Here is that weak edge. The limit is five a minute, counted in fixed windows that start at the top of each minute.',
+        'In the very last second of the first minute, a script sends five requests. All five fit.',
+        'One second later the minute changes, and the counter goes back to zero. The script sends five more, and all five fit again.',
+        'That is ten requests in about two seconds, on a limit of five a minute. A fixed window allows up to twice the limit around every boundary.',
+        'A token bucket closes this gap. The bucket holds at most five tokens, whatever the clock says, so the second burst is refused.',
+      ],
+      beats: [
+        { focus: ['win'] },
+        { badge: { script: '12:00:59' }, send: [{ path: ['script', 'api'], label: '5 requests' }], rows: { win: ['window: 12:00', 'count: 5 of 5'] } },
+        { badge: { script: '12:01:00' }, send: [{ path: ['script', 'api'], label: '5 requests' }], rows: { win: ['window: 12:01', 'count: 5 of 5'] } },
+        { badge: { api: '10 in 2 s' }, note: 'Twice the limit, at every boundary' },
+        {
+          badge: { api: null },
+          rows: { win: ['token bucket', 'tokens: 0 of 5'] },
+          send: [
+            { path: ['script', 'api'], label: '5 more requests' },
+            { path: ['api', 'script'], label: '429', tone: 'fail' },
+          ],
+        },
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'The token bucket, step by step',
+      name: 'token-bucket',
+      nodes: [
+        { id: 'free', kind: 'client', label: 'Free client', sub: 'plan: free', col: 0, row: 1 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2, row: 1 },
+        { id: 'clock', kind: 'clock', label: 'Refill', sub: 'limit / 60 a second', col: 2, row: 0 },
+      ],
+      edges: [{ from: 'free', to: 'api' }, { from: 'clock', to: 'api', dashed: true }],
+      panels: [{ id: 'bucket', title: 'Bucket: free', col: 4, row: 1, width: 230, rows: ['tokens: 5 of 5', 'size: 5', 'refill: 1 every 12 s'] }],
+      say: [
+        'Now the token bucket, step by step. Each client gets a bucket. Its size is the plan limit: five tokens on the free plan, 1000 on standard.',
+        'A request arrives. The server adds the tokens earned since the last request, never more than the size, then takes one. A token was there, so the answer is 200, with four left.',
+        'The client sends four more, quickly. Each one takes a token, and each one is allowed. The bucket is now empty.',
+        'The sixth request finds no token. It is refused with 429 Too Many Requests, and a refused request takes nothing.',
+        'Tokens come back at a steady rate: the limit divided by 60, every second. That is one every 12 seconds on the free plan, and one every 60 ms on standard.',
+        'So twelve seconds after the bucket ran dry, one more request gets through, and spends that token. Python and TypeScript refill smoothly; the built-in limiter in C# adds each token in one step.',
+        'Leave the client idle for a minute and the bucket fills back to five, never past five. So the size sets the biggest burst, and the refill rate holds the long run average to the plan.',
+      ],
+      beats: [
+        { focus: ['bucket'] },
+        {
+          send: [
+            { path: ['free', 'api'], label: 'GET /v1/me' },
+            { path: ['api', 'free'], label: '200, 4 left', tone: 'reply' },
+          ],
+          rows: { bucket: ['tokens: 4 of 5', 'size: 5', 'refill: 1 every 12 s'] },
+        },
+        {
+          send: [{ path: ['free', 'api'], label: '4 more requests' }],
+          rows: { bucket: ['tokens: 0 of 5', 'size: 5', 'refill: 1 every 12 s'] },
+        },
+        {
+          send: [
+            { path: ['free', 'api'], label: 'request 6' },
+            { path: ['api', 'free'], label: '429', tone: 'fail' },
+          ],
+          focus: ['bucket'],
+        },
+        {
+          send: [{ path: ['clock', 'api'], label: '+1 token', tone: 'event' }],
+          badge: { clock: '12 s' },
+          rows: { bucket: ['tokens: 1 of 5', 'size: 5', 'refill: 1 every 12 s'] },
+        },
+        {
+          rows: { bucket: ['tokens: 0 of 5', 'size: 5', 'refill: 1 every 12 s'] },
+          send: [
+            { path: ['free', 'api'], label: 'request 7' },
+            { path: ['api', 'free'], label: '200, 0 left', tone: 'reply' },
+          ],
+        },
+        { badge: { clock: '60 s', free: 'idle' }, rows: { bucket: ['tokens: 5 of 5', 'size: 5', 'refill: 1 every 12 s'] }, note: 'Size = the burst. Refill rate = the average.' },
+      ],
+    },
+    {
+      kind: 'http',
+      title: 'The RateLimit headers',
+      request: ['GET /v1/me HTTP/1.1', 'Authorization: Bearer eyJhbGciOi…'],
+      response: [
+        'HTTP/1.1 200 OK',
+        'Content-Type: application/json',
+        'RateLimit-Limit: 5',
+        'RateLimit-Remaining: 0',
+        'RateLimit-Reset: 12',
+        '',
+        '{"clientId":"free","plan":"free", …}',
+      ],
+      responseAt: 0,
+      marks: [{ req: [0, 1], res: [0, 2] }, { res: [3] }, { res: [4] }, { res: [2, 3, 4] }],
+      say: [
+        'A client should never have to guess its limit. Here is the fifth request from the free client. Like every metered response, it carries RateLimit-Limit: the plan limit, five.',
+        'RateLimit-Remaining is the number of whole tokens left after this request. This was the last one, so it says zero.',
+        'RateLimit-Reset is the number of seconds until one more token is available: 12. While tokens remain, it is zero.',
+        'These headers come from an IETF draft, not a finished RFC, so their exact form may still change. A good client reads them and slows down before it is refused.',
+      ],
+    },
+    {
+      kind: 'http',
+      title: '429 Too Many Requests',
+      request: ['GET /v1/me HTTP/1.1', 'Authorization: Bearer eyJhbGciOi…'],
+      response: [
+        'HTTP/1.1 429 Too Many Requests',
+        'Content-Type: application/problem+json',
+        'Retry-After: 12',
+        'RateLimit-Limit: 5',
+        'RateLimit-Remaining: 0',
+        'RateLimit-Reset: 12',
+        '',
+        '{"type":"/problems/rate-limited",',
+        ' "status":429,',
+        ' "detail":"Rate limit of 5 requests',
+        '   per minute exceeded.", …}',
+      ],
+      responseAt: 0,
+      marks: [{ req: [0, 1], res: [0] }, { res: [2] }, { res: [7, 8, 9, 10] }, { res: [3, 4, 5] }],
+      say: [
+        'The sixth request comes right after the fifth, and the bucket is still empty. The answer is 429 Too Many Requests, a status code from RFC 6585.',
+        'Retry-After says how many seconds to wait: 12. It is defined in RFC 9110. Retrying sooner only adds load: the bucket is still empty, so the request is refused again.',
+        'The body is problem details, with the type rate limited and a plain sentence a developer can read.',
+        'The three RateLimit headers are on the 429 too. A 401 for a bad token gets none of them, because it is never counted.',
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'Per client and per plan',
+      name: 'per-plan',
+      nodes: [
+        { id: 'reader', kind: 'client', label: 'reader', sub: 'standard plan', col: 0, row: 0 },
+        { id: 'free', kind: 'client', label: 'free', sub: 'free plan', col: 0, row: 2 },
+        { id: 'api', kind: 'server', label: 'Bookshop API', col: 2, row: 1 },
+        { id: 'reg', kind: 'file', label: 'Client records', sub: 'id, scopes, plan', col: 4, row: 0 },
+      ],
+      edges: [
+        { from: 'reader', to: 'api' },
+        { from: 'free', to: 'api' },
+        { from: 'api', to: 'reg' },
+      ],
+      panels: [{ id: 'buckets', title: 'Buckets', col: 4, row: 2, width: 250, rows: ['reader: 1000 of 1000', 'free: 5 of 5'] }],
+      say: [
+        'Limits belong to a client and its plan. Every client gets its own bucket, sized by its plan.',
+        'The client id comes from the sub claim of a verified token. The plan comes from the server’s own records, never from the request.',
+        'So reader spends from a bucket of 1000, and free from a bucket of 5. Emptying one never touches the other.',
+        'The order of the checks matters. A request with a bad token gets 401 before the limiter runs. Its client id cannot be trusted, so it is not counted.',
+        'A request with a good token but a missing scope is counted first, then refused with 403. The client is known, so it pays.',
+      ],
+      beats: [
+        { focus: ['buckets'] },
+        {
+          send: [
+            { path: ['reader', 'api'], label: 'sub: reader' },
+            { path: ['api', 'reg'], label: 'plan?' },
+            { path: ['reg', 'api'], label: 'standard', tone: 'reply' },
+          ],
+        },
+        {
+          rows: { buckets: ['reader: 999 of 1000', 'free: 0 of 5'] },
+          send: [
+            { path: ['api', 'reader'], label: '200 OK', tone: 'reply' },
+            { path: ['free', 'api'], label: '6 requests', sameTime: true },
+            { path: ['api', 'free'], label: '429', tone: 'fail' },
+          ],
+        },
+        {
+          send: [
+            { path: ['free', 'api'], label: 'bad token' },
+            { path: ['api', 'free'], label: '401', tone: 'fail' },
+          ],
+          focus: ['buckets'],
+        },
+        {
+          rows: { buckets: ['reader: 998 of 1000', 'free: 0 of 5'] },
+          send: [
+            { path: ['reader', 'api'], label: 'POST products' },
+            { path: ['api', 'reader'], label: '403, counted', tone: 'fail' },
+          ],
+        },
+      ],
+    },
+    {
+      kind: 'flow',
+      title: 'Many servers, many buckets',
+      name: 'many-servers',
+      nodes: [
+        { id: 'free', kind: 'client', label: 'Free client', col: 0, row: 1 },
+        { id: 'lb', kind: 'lb', label: 'Load balancer', col: 1.5, row: 1 },
+        { id: 'a', kind: 'server', label: 'API copy A', col: 3, row: 0 },
+        { id: 'b', kind: 'server', label: 'API copy B', col: 3, row: 1 },
+        { id: 'c', kind: 'server', label: 'API copy C', col: 3, row: 2 },
+        { id: 'redis', kind: 'cache', label: 'Shared buckets', sub: 'Redis or DynamoDB', col: 5, row: 1, hidden: true },
+      ],
+      edges: [
+        { from: 'free', to: 'lb' },
+        { from: 'lb', to: 'a' },
+        { from: 'lb', to: 'b' },
+        { from: 'lb', to: 'c' },
+        { from: 'a', to: 'redis', hidden: true },
+        { from: 'b', to: 'redis', hidden: true },
+        { from: 'c', to: 'redis', hidden: true },
+      ],
+      say: [
+        'This API keeps its buckets in the memory of one process. Production runs several copies.',
+        'The load balancer spreads the free client’s requests across three copies. Each copy has its own bucket of five, and each one says yes.',
+        'So the client gets 15 requests a minute, not 5. The real limit is multiplied by the number of copies.',
+        'The fix is to keep the buckets in one shared store, such as Redis or DynamoDB, and to take a token in one atomic step.',
+        'Now every copy spends from the same bucket, and the sixth request is refused wherever it lands. A gateway in front of all copies is the other common fix.',
+      ],
+      beats: [
+        { badge: { a: '5 of 5', b: '5 of 5', c: '5 of 5' } },
+        {
+          send: [
+            { path: ['free', 'lb', 'a'], label: '5 requests' },
+            { path: ['free', 'lb', 'b'], label: '5 requests' },
+            { path: ['free', 'lb', 'c'], label: '5 requests' },
+          ],
+          badge: { a: '0 of 5', b: '0 of 5', c: '0 of 5' },
+        },
+        { badge: { free: '15 a minute' }, note: 'Three copies, three buckets: 15, not 5' },
+        { show: ['redis', 'a-redis', 'b-redis', 'c-redis'], badge: { a: null, b: null, c: null, free: null }, focus: ['redis'] },
+        {
+          badge: { redis: '0 of 5' },
+          send: [
+            { path: ['free', 'lb', 'c'], label: 'request 6' },
+            { path: ['c', 'redis'], label: 'take 1' },
+            { path: ['redis', 'c'], label: 'empty', tone: 'fail' },
+            { path: ['c', 'lb', 'free'], label: '429', tone: 'fail' },
+          ],
+        },
+      ],
+    },
+    {
+      kind: 'table',
+      title: 'Where limits live in the cloud',
+      head: ['Cloud', 'Per client or key', 'Per IP, at the edge'],
+      rows: [
+        ['AWS', 'API Gateway usage plans', 'WAF rate-based rules'],
+        ['GCP', 'Apigee, Endpoints quotas', 'Cloud Armor'],
+        ['Azure', 'API Management rate-limit-by-key', 'Front Door WAF rules'],
+      ],
+      lead: 1,
+      say: [
+        'In the cloud, a gateway in front of your servers can do the counting for you.',
+        'On AWS, API Gateway usage plans with API keys give quotas per client, on REST APIs. AWS WAF has rate-based rules per IP address.',
+        'On Google Cloud, Apigee has quota and spike arrest policies, and Cloud Endpoints has quotas per API key. Cloud Armor limits per IP.',
+        'On Azure, API Management has the rate limit by key policy, and the Front Door firewall has rate limit rules.',
+      ],
+    },
+    {
+      kind: 'signals',
+      title: 'When to reach for a rate limit',
+      lead: 1,
+      rows: [
+        { see: 'A public API with plans', think: 'A token bucket per client, sized by plan' },
+        { see: 'Several API servers', think: 'Shared buckets, or a gateway limit' },
+        { see: 'Clients retrying in a storm', think: 'Retry-After on every 429' },
+        { see: 'A slow, expensive endpoint', think: 'Throttling: limit work in progress' },
+      ],
+      say: [
+        'Here is how to spot rate limiting questions in design reviews and interviews.',
+        'A public API with free and paid plans needs a bucket per client, sized by the plan.',
+        'When there are several API servers, the buckets must be shared, or the limit must sit in a gateway in front of them.',
+        'When thousands of clients retry at once after an outage, make sure every 429 carries Retry-After.',
+        'And when one endpoint is slow and expensive, counting requests is not enough. That is throttling, the next lesson.',
+      ],
+    },
+    {
+      kind: 'points',
+      title: 'Common mistakes',
+      tone: 'warn',
+      points: [
+        'Buckets in each process only',
+        'A 429 with no Retry-After',
+        'Limiting by IP address only',
+        'Retrying a 429 at once',
+      ],
+      say: [
+        'Keeping buckets in each process, with many servers. The real limit becomes the limit times the number of copies.',
+        'Sending 429 without Retry-After. Clients then retry at once, and make the overload worse.',
+        'Limiting by IP address only. Many users share one IP behind an office proxy, and one attacker can use many IPs. Prefer the authenticated client.',
+        'And on the client side: retrying a 429 right away. Wait for the time in Retry-After.',
+      ],
+    },
+    {
+      kind: 'pause',
+      title: 'Pause and think',
+      question: 'A free client was idle for ten minutes. How many requests can it send right now before a 429, and how often after that?',
+      answer: 'Five at once: the bucket never holds more than five. After that, about one every 12 seconds.',
+      say: ['A free client was idle for ten minutes. How many requests can it send right now before it gets a 429? And how often can it send after that?'],
+      answerSay: [
+        'Five at once. The bucket refilled long ago, but it never holds more than its size, five.',
+        'After that, the client gets one token every 12 seconds, so about one request every 12 seconds.',
+      ],
+    },
+    {
+      kind: 'recap',
+      title: 'Recap',
+      points: [
+        'Limit each client to a fair share',
+        'Token bucket: size for bursts, refill for the average',
+        'RateLimit headers on every metered response',
+        'Empty bucket: 429 with Retry-After',
+        'Shared buckets or a gateway for many servers',
+      ],
+      next: 'throttling',
+      say: [
+        'Let us recap.',
+        'A rate limit gives each client a fair share, and keeps cost and abuse in check.',
+        'A token bucket per client: the size allows bursts, the refill holds the average.',
+        'Every metered response says the limit, what is left, and when the next token comes.',
+        'An empty bucket answers 429 with Retry-After.',
+        'With many servers, share the buckets or limit at a gateway. Now open the practice tab and empty a real bucket, then watch the next lesson: throttling.',
+      ],
+    },
+  ],
+};

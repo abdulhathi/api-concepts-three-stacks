@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 from pydantic import AfterValidator, Field
 
-from app.models.base import ApiModel, UtcTimestamp
+from app.models.base import ApiInput, ApiModel, UtcTimestamp
 
 EventType = Literal["order.created", "order.paid"]
 DeliveryStatus = Literal["pending", "succeeded", "failed"]
@@ -22,7 +22,7 @@ def _dedupe(events: list[EventType]) -> list[EventType]:
     return list(dict.fromkeys(events))
 
 
-class WebhookCreate(ApiModel):
+class WebhookCreate(ApiInput):
     url: Annotated[str, AfterValidator(_http_url)]
     events: Annotated[list[EventType], Field(min_length=1), AfterValidator(_dedupe)]
 

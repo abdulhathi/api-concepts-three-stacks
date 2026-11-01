@@ -115,13 +115,13 @@ public static class ServiceRegistration
                 Type = SecuritySchemeType.Http,
                 Scheme = "bearer",
                 BearerFormat = "JWT",
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "bearer" },
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "bearerAuth" },
             };
             document.Components ??= new OpenApiComponents();
-            document.Components.SecuritySchemes["bearer"] = bearer;
+            document.Components.SecuritySchemes["bearerAuth"] = bearer;
             document.SecurityRequirements.Add(new OpenApiSecurityRequirement { [bearer] = [] });
             return Task.CompletedTask;
-        }));
+        }).AddOperationTransformer(OpenApiBody.AddRequestBody));
         return services;
     }
 

@@ -4,15 +4,15 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from app.models.base import ApiModel, UtcTimestamp
+from app.models.base import ApiInput, ApiModel, UtcTimestamp
 
 
-class OrderItemInput(ApiModel):
+class OrderItemInput(ApiInput):
     product_id: str
     quantity: Annotated[int, Field(strict=True, ge=1, le=100)]
 
 
-class OrderCreate(ApiModel):
+class OrderCreate(ApiInput):
     items: Annotated[list[OrderItemInput], Field(min_length=1, max_length=50)]
 
 

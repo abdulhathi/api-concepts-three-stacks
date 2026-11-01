@@ -11,7 +11,9 @@ function hasBody(headers: Record<string, string | string[] | undefined>): boolea
 }
 
 const requireJsonContentType: RequestHandler = (req, _res, next) => {
-  if (BODY_METHODS.has(req.method) && hasBody(req.headers) && !JSON_TYPE.test(req.get('Content-Type') ?? '')) {
+  const type = req.get('Content-Type') ?? '';
+  const ok = JSON_TYPE.test(type) && (req.method === 'PATCH' || !/merge-patch/i.test(type)); // merge patch: PATCH only
+  if (BODY_METHODS.has(req.method) && hasBody(req.headers) && !ok) {
     throw new ApiProblem('unsupported-media-type', 'Send the body as Content-Type: application/json.');
   }
   next();

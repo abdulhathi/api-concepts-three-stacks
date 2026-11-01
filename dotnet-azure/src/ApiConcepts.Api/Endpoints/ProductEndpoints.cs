@@ -24,15 +24,15 @@ public static class ProductEndpoints
             .WithBody<ProductBody>("application/json")
             .Produces<Product>(201);
         products.MapPut("/{id}", Replace).RequireAuthorization("products:write")
-            .WithSummary("Replace a product (honours If-Match)")
+            .WithSummary("Replace a product (honors If-Match)")
             .WithBody<ProductBody>("application/json")
             .Produces<Product>();
         products.MapPatch("/{id}", Patch).RequireAuthorization("products:write")
-            .WithSummary("Change some fields of a product (honours If-Match)")
+            .WithSummary("Change some fields of a product (honors If-Match)")
             .WithBody<ProductBody>("application/json", "application/merge-patch+json")
             .Produces<Product>();
         products.MapDelete("/{id}", Delete).RequireAuthorization("admin")
-            .WithSummary("Delete a product (honours If-Match)")
+            .WithSummary("Delete a product (honors If-Match)")
             .Produces(204);
     }
 

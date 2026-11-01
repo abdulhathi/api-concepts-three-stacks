@@ -4,6 +4,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 
@@ -11,18 +12,27 @@ namespace ApiConcepts.Api.Endpoints;
 
 public static class OpenApiBody
 {
+    /// <summary>Marks the endpoint's body type; <see cref="AddRequestBody"/> writes it into the document.</summary>
     public static RouteHandlerBuilder WithBody<T>(this RouteHandlerBuilder builder, params string[] contentTypes) =>
-        builder.WithOpenApi(operation =>
+        builder.WithMetadata(new BodyMetadata(typeof(T), contentTypes.Length > 0 ? contentTypes : ["application/json"]));
+
+    /// <summary>An operation transformer for AddOpenApi: the request body of every endpoint marked with WithBody.</summary>
+    public static Task AddRequestBody(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken _)
+    {
+        if (context.Description.ActionDescriptor.EndpointMetadata.OfType<BodyMetadata>().LastOrDefault() is { } body)
         {
-            var schema = SchemaFor(typeof(T));
+            var schema = SchemaFor(body.Type);
             operation.RequestBody = new OpenApiRequestBody
             {
                 Required = true,
-                Content = (contentTypes.Length > 0 ? contentTypes : ["application/json"])
-                    .ToDictionary(type => type, _ => new OpenApiMediaType { Schema = schema }),
+                Content = body.ContentTypes.ToDictionary(type => type, _ => new OpenApiMediaType { Schema = schema }),
             };
-            return operation;
-        });
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private sealed record BodyMetadata(Type Type, string[] ContentTypes);
 
     private static OpenApiSchema SchemaFor(Type type)
     {

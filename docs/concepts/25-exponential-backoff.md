@@ -22,7 +22,7 @@ The delay before retry `n` is `random(0.5, 1.0) x min(cap, base x 2^(n-1))`. The
 
 - Client: base 200 ms, cap 5000 ms, both options so tests run fast. `Retry-After` seconds win when present.
 - Webhook retries use the same formula with base `WEBHOOK_RETRY_BASE_MS` (default 500) and a 60 s cap, up to `WEBHOOK_MAX_ATTEMPTS` (default 5) attempts in total.
-- Jitter source and sleep function are injectable, so tests check exact delays without waiting.
+- In the Python and TypeScript clients the jitter source is injectable, so tests check exact delays. The C# client draws from `Random.Shared`, so its test checks that each delay falls in the range.
 
 ## Side by side
 

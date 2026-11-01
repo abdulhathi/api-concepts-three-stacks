@@ -75,7 +75,7 @@ const parseJson: RequestHandler = (req, _res, next) => {
   next();
 };
 ```
-[`src/http/body.ts` lines 22-32](../../node-typescript-gcp/src/http/body.ts#L22-L32)
+[`src/http/body.ts` lines 24-34](../../node-typescript-gcp/src/http/body.ts#L24-L34)
 
 ### C# · ASP.NET Core
 The handlers read the raw JSON and check every field by hand, collecting all problems before they fail.
@@ -111,7 +111,7 @@ curl -s -X POST localhost:8001/v1/products -H "Authorization: Bearer $TOKEN" -H 
 
 ## In the cloud
 
-- **AWS:** API Gateway REST APIs can validate a body against a JSON Schema model. The HTTP API used here passes the body through, with a 10 MB limit.
+- **AWS:** API Gateway REST APIs can validate a body against a JSON Schema model. The HTTP API used here passes the body through. API Gateway accepts up to 10 MB, but a synchronous Lambda invocation takes at most 6 MB, so 6 MB is the real limit here.
 - **GCP:** nothing extra needed for validation. Cloud Run accepts requests up to 32 MiB.
 - **Azure:** API Management has a `validate-content` policy if you want checks before the app. Otherwise nothing extra is needed.
 

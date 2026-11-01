@@ -13,9 +13,20 @@ UtcTimestamp = Annotated[datetime, PlainSerializer(format_timestamp, return_type
 
 class ApiModel(BaseModel):
     # Unknown request properties are ignored (spec); output always uses the camelCase alias.
+    # Code may build models by their snake_case names.
     model_config = ConfigDict(
-        alias_generator=to_camel, populate_by_name=True, serialize_by_alias=True, extra="ignore"
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+        serialize_by_alias=True,
+        extra="ignore",
     )
 
     def to_json(self) -> dict[str, Any]:
         return self.model_dump(mode="json", by_alias=True)
+
+
+class ApiInput(ApiModel):
+    # A request body accepts only the camelCase names: "price_cents" is an unknown property,
+    # so it is ignored.
+    model_config = ConfigDict(validate_by_name=False)

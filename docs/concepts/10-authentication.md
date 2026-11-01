@@ -51,13 +51,14 @@ A dependency factory, `require()`, reads the token through `HTTPBearer(auto_erro
         try:
             principal = container.tokens.verify(credentials.credentials)
         except TokenError as exc:
+            # The client learns only that the token was rejected, never which check failed.
             raise Problem(
                 "unauthorized",
-                str(exc),
+                "The access token is missing, expired or invalid.",
                 headers={"WWW-Authenticate": f'{REALM}, error="invalid_token"'},
             ) from exc
 ```
-[`app/auth/dependencies.py` lines 39-46](../../python-fastapi-aws/app/auth/dependencies.py#L39-L46)
+[`app/auth/dependencies.py` lines 42-50](../../python-fastapi-aws/app/auth/dependencies.py#L42-L50)
 
 ### TypeScript · Express
 An `authenticate` middleware checks the header with a regex and verifies the JWT with `jose`. The excerpt is the failure branch.

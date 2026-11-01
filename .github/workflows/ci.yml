@@ -69,3 +69,20 @@ jobs:
       - name: Contract tests
         working-directory: contract-tests
         run: npm ci && ./run.sh dotnet
+
+  tutorial-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tutorial-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Videos, practice labs and guide links
+        run: npm test

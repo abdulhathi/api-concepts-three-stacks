@@ -10,12 +10,15 @@ root="$(cd "$here/.." && pwd)"
 # Fast webhook retries keep the suite quick; everything else uses the spec's defaults.
 export WEBHOOK_RETRY_BASE_MS=100
 
+# Its own port (18001, 18002, 18003 by default), so it never talks to a dev server already running on 8001-8003.
+offset="${CONTRACT_PORT_OFFSET:-10000}"
+
 case "$stack" in
-  python) port=8001; dir="$root/python-fastapi-aws"; build=(true)
+  python) port=$((8001 + offset)); dir="$root/python-fastapi-aws"; build=(true)
     cmd=(.venv/bin/python -m app) ;;
-  node) port=8002; dir="$root/node-typescript-gcp"; build=(npm run build --silent)
+  node) port=$((8002 + offset)); dir="$root/node-typescript-gcp"; build=(npm run build --silent)
     cmd=(node dist/index.js) ;;
-  dotnet) port=8003; dir="$root/dotnet-azure"; build=(dotnet build src/ApiConcepts.Api -c Release --nologo -v quiet)
+  dotnet) port=$((8003 + offset)); dir="$root/dotnet-azure"; build=(dotnet build src/ApiConcepts.Api -c Release --nologo -v quiet)
     cmd=(dotnet src/ApiConcepts.Api/bin/Release/net9.0/ApiConcepts.Api.dll) ;;
   *) echo "unknown stack: $stack" >&2; exit 2 ;;
 esac

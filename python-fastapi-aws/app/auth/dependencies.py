@@ -18,7 +18,10 @@ REALM = 'Bearer realm="api-concepts"'
 
 # Makes Swagger UI show the "Authorize" button; auto_error=False so we can raise our own 401.
 bearer_scheme = HTTPBearer(
-    auto_error=False, scheme_name="bearerAuth", description="Access token from POST /oauth/token"
+    auto_error=False,
+    bearerFormat="JWT",
+    scheme_name="bearerAuth",
+    description="Access token from POST /oauth/token",
 )
 
 
@@ -39,9 +42,10 @@ def require(scope: str | None = None) -> Callable[..., Awaitable[Principal]]:
         try:
             principal = container.tokens.verify(credentials.credentials)
         except TokenError as exc:
+            # The client learns only that the token was rejected, never which check failed.
             raise Problem(
                 "unauthorized",
-                str(exc),
+                "The access token is missing, expired or invalid.",
                 headers={"WWW-Authenticate": f'{REALM}, error="invalid_token"'},
             ) from exc
 

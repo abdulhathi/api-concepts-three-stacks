@@ -94,7 +94,7 @@ curl -s -w '\n%{http_code} after %{time_total}s\n' "http://localhost:8001/v1/rep
 
 ## Common mistakes
 
-- **No client timeout.** Many HTTP libraries wait forever by default.
+- **No client timeout.** Some HTTP clients never time out by default (Python's requests library), and others wait for minutes (.NET's HttpClient waits 100 seconds). Set your own.
 - **Timing out without cancelling.** The response is sent, but the job keeps running and holding its slot.
 - **A deadline longer than the layer in front.** The gateway answers first, and your 504 is never seen.
 

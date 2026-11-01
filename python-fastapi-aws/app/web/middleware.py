@@ -123,8 +123,11 @@ class CrashGuard:
             await self.app(scope, receive, tracking_send)
         except Exception:
             request = Request(scope)
+            # The id is in the message itself, so it shows whatever log format is configured.
             error_log.exception(
-                "unhandled exception", extra={"request_id": request.state.request_id}
+                "unhandled exception, requestId=%s",
+                request.state.request_id,
+                extra={"request_id": request.state.request_id},
             )
             if started:
                 raise

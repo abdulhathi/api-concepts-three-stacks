@@ -31,7 +31,7 @@ HTTP/1.1 503 Service Unavailable
 Content-Type: application/problem+json
 Retry-After: 1
 
-{"type":"/problems/throttled","title":"The server is busy, try again shortly","status":503, ...}
+{"type":"/problems/throttled","title":"The server is busy","status":503, ...}
 ```
 
 ## The rule in this repo

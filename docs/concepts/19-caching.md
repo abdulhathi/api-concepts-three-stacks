@@ -40,7 +40,7 @@ Cache-Control: private, max-age=60
 - `GET /v1/products/{id}`: strong `ETag: "<id>-v<version>"` and `Cache-Control: private, max-age=60`.
 - `GET /v1/products`: weak `ETag: W/"<hash of the body>"` and `Cache-Control: private, max-age=30`.
 - `If-None-Match` matching the ETag (or `*`) gives 304 with no body, and the same `ETag` and `Cache-Control`.
-- `PUT`, `PATCH` and `DELETE` honour `If-Match`. Present and different from the current ETag gives 412 `precondition-failed`.
+- `PUT`, `PATCH` and `DELETE` honor `If-Match`. Present and different from the current ETag gives 412 `precondition-failed`.
 - Any response under `/v1`, `/graphql` or `/oauth` that sets no `Cache-Control` gets `no-store`.
 
 ## Side by side
